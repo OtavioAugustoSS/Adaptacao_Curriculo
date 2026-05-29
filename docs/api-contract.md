@@ -4,7 +4,10 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-29 — versão inicial (congelamento).
+> Última alteração: 2026-05-29 — nota em §3: o renderer recebe o cabeçalho (`Profile`)
+> como parâmetro separado do `ResumeContent` (detalhe de implementação, coerente com ADR-0007;
+> contrato permanece congelado, sem mudança de schema).
+> 2026-05-29 — versão inicial (congelamento).
 
 Como o app é um único processo Next.js, o "contrato" são os **schemas Zod compartilhados**
 (`src/lib/schemas/`) + a lista de **Route Handlers**. Os schemas são a única definição de
@@ -65,3 +68,13 @@ ResumeContent = {
 - O renderer (`render-latex.ts`) mapeia esse objeto nas seções do template faangpath
   (`OBJECTIVE`, `Education`, `SKILLS`, `EXPERIENCE`, `PROJECTS`, `Extra-Curricular`,
   `Leadership`), aplicando `escapeLatex()` em todo texto.
+
+> **Nota (2026-05-29) — cabeçalho separado do `ResumeContent`.** O `ResumeContentSchema`
+> NÃO contém bloco de cabeçalho (nome/contato). O cabeçalho do `.tex` (`\name{...}` e
+> `\address{...}`) vem **verbatim do `Profile`** (nome + linhas de contato: location, phone,
+> email, linkedin, github, website — todos opcionais, omitindo vazios), também escapado por
+> `escapeLatex()`. Por isso a assinatura do renderer é
+> `renderResume(content: ResumeContent, header: Profile): string`. Razão: contato é dado
+> factual do `Profile`, não conteúdo gerado/selecionado pelo LLM — fica fora do `ResumeContent`
+> para não duplicar dados nem abrir espaço para o modelo divergir do cabeçalho real. Coerente
+> com o invariante anti-alucinação e com ADR-0007; não altera schema (contrato congelado).

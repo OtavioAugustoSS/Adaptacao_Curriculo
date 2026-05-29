@@ -19,6 +19,16 @@ omit, reorder, and reword items that already exist in the user's data base. Outp
 The authoritative technical reference is **`ARCHITECTURE.md`** — read it before any technical
 decision. This file is the quick operational summary; `ARCHITECTURE.md` and `docs/` are canonical.
 
+## Where we are / how to resume
+
+**Read `docs/release/fatia-1.md` first** — it is the committed source of truth for current
+progress, key decisions, known pitfalls, fresh-machine setup steps, and the next slice. As of
+2026-05-29: Slices 0 (scaffold) and 1 (US-01 renderer, US-02 profile CRUD, US-03 base items) are
+**done and verified** (`tsc` clean · `npm test` 48/48 · `next build` OK). **Next is Slice 2**
+(US-04 `LLMProvider`→NVIDIA NIM, US-05 Mode-1 generation, US-06 `.tex` download). On a freshly
+cloned machine, follow the setup steps in `docs/release/fatia-1.md` (you must supply your own NIM
+`LLM_API_KEY` in `.env`). Note: the project owner makes the git commits — propose them, don't commit yourself.
+
 ## Stack (see ARCHITECTURE.md §2)
 
 Next.js 15 (App Router) + TypeScript · Prisma + SQLite (MVP) → Postgres · Zod · Vitest ·
