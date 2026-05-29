@@ -1,0 +1,18 @@
+REFERÊNCIA — resume.cls (faangpath-simple-template)
+
+Este arquivo é apenas uma nota de referência. NÓS NÃO compilamos LaTeX (ADR-0002):
+o sistema gera só o .tex, e o usuário compila no Overleaf, onde a classe `resume.cls`
+do template já está presente.
+
+Template original:
+https://www.overleaf.com/latex/templates/faangpath-simple-template/npsfpdqnxmbc
+
+A classe `resume` fornece, entre outros:
+- \name{...} e \address{...} para o cabeçalho
+- o ambiente rSection: \begin{rSection}{TÍTULO} ... \end{rSection}
+
+Seções usadas pelo nosso renderer (ver docs/api-contract.md §3 — ResumeContent):
+OBJECTIVE · Education · SKILLS · EXPERIENCE · PROJECTS · Extra-Curricular Activities · Leadership
+
+O .tex que geramos começa com \documentclass{resume}; portanto, ao compilar no
+Overleaf, o projeto precisa conter o resume.cls do template faangpath.

@@ -24,3 +24,6 @@ prisma/dev.db*
 
 # Test / coverage
 coverage/
+
+# TypeScript build info
+*.tsbuildinfo
