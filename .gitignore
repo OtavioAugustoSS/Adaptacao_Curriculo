@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Environment
+.env
+.env*.local
+
+# Database (SQLite no MVP)
+*.db
+*.db-journal
+prisma/dev.db*
+
+# Logs / OS / editor
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Test / coverage
+coverage/
