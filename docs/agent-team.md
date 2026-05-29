@@ -8,8 +8,16 @@
 > conversaram entre si.
 
 Especificação do time usado na **fase de implementação** (rodando em fatias — ver
-`template-claude-workflow.md` §6.8). Adaptação para um único app Next.js: **backend e
-frontend colapsados num só `fullstack-agent`**.
+`template-claude-workflow.md` §6.8). Adaptação para um único app Next.js: **time híbrido
+por fatia**.
+
+- **Composição base (Fatias 1–3):** `lead`, `product-owner`, `architect`, **`fullstack-agent`**, `qa`.
+  As fatias iniciais são pesadas de backend (renderer, dados, LLM, guardrail) com pouca UI —
+  um único agente de implementação evita handoff artificial num codebase Next.js único.
+- **Composição estendida (Fatia 4 — polimento visual):** o `fullstack-agent` dá lugar a
+  **`frontend-agent`** + **`backend-agent`**, para um agente dedicado carregar a qualidade de
+  design. O contrato Zod congelado é a fronteira que permite os dois trabalharem em paralelo
+  sem um esperar o outro.
 
 ## Agentes
 
@@ -30,7 +38,7 @@ frontend colapsados num só `fullstack-agent`**.
 - **Output:** novos ADRs em `docs/adr/`; é o **dono do contrato Zod** (`docs/api-contract.md`).
 - Autoridade técnica final; aprova/rejeita mudanças no contrato; valida aderência à arquitetura.
 
-### `fullstack-agent` (Opus) — Fullstack Developer  *(substitui backend + frontend)*
+### `fullstack-agent` (Opus) — Fullstack Developer  *(Fatias 1–3)*
 - **Ferramentas:** Read, Write, Edit, Glob, Grep, Bash
 - **Output:** código em `src/`, `prisma/`, `templates/`, `tests/`
 - Lê `ARCHITECTURE.md`, `docs/api-contract.md`, `docs/user-stories/`, `docs/adr/`, `docs/spec.md`.
@@ -40,18 +48,36 @@ frontend colapsados num só `fullstack-agent`**.
 - Dúvida funcional → `product-owner-agent`; dúvida técnica → `architect-agent`.
 - Trabalha em branch dedicada; cada US gera commit + testes.
 
-### `qa-agent` (opus) — Quality Engineer
+### `qa-agent` (Opus) — Quality Engineer
 - **Ferramentas:** Read, Write, Edit, Glob, Grep, Bash
 - **Output:** testes em `tests/`
 - Garante cobertura da lógica pura crítica (`escapeLatex`, `renderResume`, `validateTraceability`).
 
+### `backend-agent` (Opus) — Backend Developer  *(somente Fatia 4)*
+- **Ferramentas:** Read, Write, Edit, Glob, Grep, Bash
+- **Ownership:** `src/server/`, `src/app/api/`, `prisma/`, `src/lib/schemas/` e Server Actions.
+- É o mantenedor do contrato Zod; mudanças só via proposta ao architect.
+
+### `frontend-agent` (Opus) — Frontend Developer  *(somente Fatia 4)*
+- **Ferramentas:** Read, Write, Edit, Glob, Grep, Bash
+- **Ownership:** `src/components/` e a **apresentação** de `src/app/**/page.tsx`.
+- Consome os schemas Zod do contrato **read-only**; pode usar as skills `frontend-design` /
+  `ui-ux-pro-max` para a qualidade visual. Dúvida técnica → `architect-agent`.
+
 ## Protocolo
+- **Composição varia por fatia** (ver topo): `fullstack-agent` nas Fatias 1–3; split
+  `backend-agent` + `frontend-agent` na Fatia 4.
+- **Fronteira de ownership no split:** backend = `src/server/`, `src/app/api/`, `prisma/`,
+  `src/lib/schemas/`, Server Actions; frontend = `src/components/` + apresentação das páginas.
+  Isso evita atrito no App Router (onde Server Components/Actions borram a linha front/back).
 - **Contrato Zod** (`docs/api-contract.md`) é a fonte da verdade; só o architect aprova mudança.
 - Conflito funcional → PO; técnico → Architect; impasse → lead escala para o humano.
 - Toda decisão técnica nova vira ADR; toda US implementada inclui testes.
 - Rodar em **fatias de 3–5 US por sessão**, menor dependência primeiro; `/clear` entre fatias.
 
-## Prompt de criação (ajuste a fatia a cada sessão)
+## Prompt de criação (ajuste a fatia e a composição a cada sessão)
+
+**Fatias 1–3** (composição base, 5 agentes):
 
 ```
 Crie um Agent Team chamado `cv-adapter-development-team` com 5 agentes
@@ -67,3 +93,8 @@ Regras inegociáveis:
 NESTA SESSÃO, implemente apenas esta fatia: <US-NN, US-NN, US-NN>.
 Comece pelas de menor dependência.
 ```
+
+**Fatia 4** (composição estendida — split front/back para polimento visual): troque o
+`Fullstack` por `Backend` + `Frontend` (6 agentes) e acrescente a regra:
+"6. Respeitem o ownership por diretório de docs/agent-team.md; o frontend consome o contrato
+Zod read-only; mudança no contrato só via proposta ao architect."

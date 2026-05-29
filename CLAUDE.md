@@ -56,7 +56,9 @@ implementation in **slices of ~3–5 user stories per session** via the Agent Te
 (`cv-adapter-development-team`), `/clear` between slices.
 
 Adaptations from the template for this single Next.js app:
-- Backend + frontend agents are **collapsed into one `fullstack-agent`** (no cross-process handoff).
+- The Agent Team is **hybrid per slice**: one `fullstack-agent` for Slices 1–3 (backend-heavy,
+  little UI), splitting into `frontend-agent` + `backend-agent` for Slice 4 (visual polish),
+  with the frozen Zod contract + directory ownership as the boundary. See `docs/agent-team.md`.
 - The "API contract" is **Zod schemas + the route list**, not an OpenAPI/tRPC handoff.
 - `docs/spec.md` replaces `design_handoff/` (no visual design exists yet; can be generated
   later with the `frontend-design` / `ui-ux-pro-max` skills).
