@@ -21,13 +21,20 @@ decision. This file is the quick operational summary; `ARCHITECTURE.md` and `doc
 
 ## Where we are / how to resume
 
-**Read `docs/release/fatia-1.md` first** — it is the committed source of truth for current
-progress, key decisions, known pitfalls, fresh-machine setup steps, and the next slice. As of
-2026-05-29: Slices 0 (scaffold) and 1 (US-01 renderer, US-02 profile CRUD, US-03 base items) are
-**done and verified** (`tsc` clean · `npm test` 48/48 · `next build` OK). **Next is Slice 2**
-(US-04 `LLMProvider`→NVIDIA NIM, US-05 Mode-1 generation, US-06 `.tex` download). On a freshly
-cloned machine, follow the setup steps in `docs/release/fatia-1.md` (you must supply your own NIM
-`LLM_API_KEY` in `.env`). Note: the project owner makes the git commits — propose them, don't commit yourself.
+**Read `docs/release/fatia-3.md` first** — the committed source of truth for current progress
+(the `docs/release/fatia-N.md` series chains the history: fatia-1 → fatia-2 → fatia-3). As of
+2026-05-30 the **MVP is functionally complete**: all 9 user stories (US-01…US-09) done and
+verified, committed on `main` (latest `a38d617` — Fatia 3). `tsc` clean · `npm test` **147/147** ·
+`next build` OK. **Both Mode 1 and Mode 2 are validated end-to-end against real NVIDIA NIM** —
+Mode 2 smoke test passed 2026-05-30 (see `docs/release/fatia-3.md` → "Smoke test real do Modo 2"):
+guardrail clean (`errors: []`, `warnings: []`), no invented company/skill. **The MVP is therefore
+functionally closed.** **Fatia 4 — visual polish** (split `fullstack-agent` into `frontend-agent` +
+`backend-agent`, use the design skills; UI today is functional inline-styles) **is deferred to the
+LAST step, on the owner's explicit request** — do NOT spawn the extended team or run design skills
+proactively until asked. On a freshly cloned machine, follow the setup in `docs/release/fatia-1.md`
+(supply your own NIM `LLM_API_KEY` — it **must start with `nvapi-`**, else 401). Windows gotcha:
+if `next build` fails with a missing-manifest ENOENT, delete `.next` and rebuild (stale cache, not
+a code bug). The project owner makes the git commits — propose them, don't commit yourself.
 
 ## Stack (see ARCHITECTURE.md §2)
 
@@ -69,6 +76,13 @@ Adaptations from the template for this single Next.js app:
 - The Agent Team is **hybrid per slice**: one `fullstack-agent` for Slices 1–3 (backend-heavy,
   little UI), splitting into `frontend-agent` + `backend-agent` for Slice 4 (visual polish),
   with the frozen Zod contract + directory ownership as the boundary. See `docs/agent-team.md`.
+- **MUST spawn the FULL team every slice — 5 distinct roles, not just lead+fullstack:**
+  `lead` + `product-owner-agent` + `architect-agent` + (`fullstack-agent` | for Slice 4
+  `frontend-agent`+`backend-agent`) + `qa-agent`. The **lead ONLY** coordinates by message,
+  verifies artifacts by hand, and consolidates the release report — it does **NOT** absorb the
+  PO or architect. The **architect** writes/owns the ADRs and validates contract adherence; the
+  **PO** resolves `[DECISÃO PENDENTE]` and accepts the stories; the **QA** hardens tests. Recreate
+  the team with `TeamCreate` each session — it dies on `/clear` **and on session resume**.
 - The "API contract" is **Zod schemas + the route list**, not an OpenAPI/tRPC handoff.
 - `docs/spec.md` replaces `design_handoff/` (no visual design exists yet; can be generated
   later with the `frontend-design` / `ui-ux-pro-max` skills).

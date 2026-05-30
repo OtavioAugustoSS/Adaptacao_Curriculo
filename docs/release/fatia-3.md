@@ -17,8 +17,30 @@
   + US-07 entregues e verificadas.
 - **Verificado à mão (lead):** `tsc --noEmit` limpo · `npm test` **147/147** · `next build` OK.
 - A geração real (Modo 1) já foi validada de ponta a ponta contra a NVIDIA NIM nesta máquina
-  (chave `nvapi-` válida no `.env`). O Modo 2 usa a mesma cadeia + guardrail; testado com mocks
-  (recomendado um smoke test real do Modo 2 colando uma vaga em `/gerar`).
+  (chave `nvapi-` válida no `.env`). O **Modo 2 também foi validado real** em 2026-05-30 (ver
+  abaixo "Smoke test real do Modo 2").
+
+## Smoke test real do Modo 2 (2026-05-30) — ✅ PASSOU
+
+Validação manual de ponta a ponta pela UI `/gerar` (Adaptar à vaga) contra a NVIDIA NIM
+(`meta/llama-3.3-70b-instruct`), com a base de exemplo semeada (Mariana Costa). Vaga de teste:
+backend fintech pedindo Go/PostgreSQL/sistemas distribuídos (que ela **tem**) **misturados** com
+Kubernetes, AWS, Python, Kafka, React, GraphQL (que ela **não tem**) — sonda direta do invariante
+anti-alucinação.
+
+- `POST /api/resumes/generate` → **200**, `.tex` renderizado + download funcionando, persistido
+  como `JOB_ADAPTIVE` com `jobPostingId`.
+- **Guardrail:** `traceabilityReport` = `{ errors: [], warnings: [] }` (passou na 1ª tentativa,
+  sem regeneração).
+- **Invariante respeitado:** nenhuma empresa/skill inventada. As tecnologias da vaga que ela não
+  possui (Kubernetes/AWS/Python/Kafka/React/GraphQL) foram **omitidas** — não adicionadas. Skills
+  reordenadas para priorizar a vaga (Go antes de TypeScript); só itens reais (Go, TypeScript,
+  PostgreSQL). Bullets reescritos sem fato novo (22% preservado). LaTeX faangpath válido, escape
+  aplicado (`22\%`, `\textbar`, `\href`).
+- Observações menores (não-bugs): o `objective` foi reescrito adicionando "liderança técnica"
+  (ancorado na experiência real de liderar time) e omitindo "6 anos"; o bullet perdeu o "4" de
+  "time de 4 engenheiros" → "time de engenheiros" (omissão permitida). `objective` não tem
+  checagem semântica (limite conhecido do ADR-0015).
 
 ## Funcionalidades implementadas (US — status)
 
@@ -62,8 +84,7 @@
   `period` não varridos; `objective` sem checagem semântica; `sourceId` forjado que casa por nome).
 - Histórico não mostra o título/texto da vaga (sem join — ADR-0016); candidato a melhoria futura
   (exigiria extensão do contrato congelado).
-- Modo 2 ainda **não** teve smoke test real contra a NIM (só mocks). Recomendado validar colando
-  uma vaga em `/gerar` com a chave `nvapi-` ativa.
+- ~~Modo 2 ainda não teve smoke test real~~ — **feito em 2026-05-30, passou** (ver seção acima).
 
 ## Pendências
 - **Nenhuma** no backlog do MVP (US-01…09 completas).

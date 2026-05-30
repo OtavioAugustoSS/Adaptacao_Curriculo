@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - heading "Gerar currículo" [level=1] [ref=e3]
+    - paragraph [ref=e4]:
+      - text: A IA monta um currículo usando apenas itens reais da sua base — nunca inventa. A saída é um arquivo
+      - code [ref=e5]: .tex
+      - text: para compilar no Overleaf.
+    - tablist "Modo de geração" [ref=e6]:
+      - tab "Currículo padrão" [disabled] [ref=e7] [cursor=pointer]
+      - tab "Adaptar à vaga" [disabled] [selected] [ref=e8] [cursor=pointer]
+    - paragraph [ref=e9]: "Modo adaptativo: cole o texto da vaga e a IA prioriza, reordena e reescreve só os itens reais que casam com ela — omitindo o que a vaga pede e você não tem."
+    - generic [ref=e22]:
+      - generic [ref=e23]: Texto da vaga
+      - textbox "Texto da vaga" [disabled] [ref=e24]:
+        - /placeholder: Cole aqui a descrição completa da vaga (responsabilidades, requisitos, etc.).
+        - text: "Vaga: Engenheiro(a) de Software Backend Sênior — Fintech de Pagamentos Buscamos uma pessoa engenheira de backend para atuar em sistemas distribuídos de alta escala no domínio de pagamentos. Responsabilidades: - Projetar e manter APIs de pagamento em Go com PostgreSQL - Otimizar custos de infraestrutura e desempenho de sistemas distribuídos - Trabalhar com mensageria assíncrona e processamento de filas - Liderar tecnicamente um time de engenheiros Requisitos obrigatórios: - Experiência sólida com Go e bancos de dados relacionais (PostgreSQL) - Vivência com sistemas distribuídos e arquitetura orientada a eventos Diferenciais (não obrigatórios): - Kubernetes, AWS, Python, Apache Kafka, React, GraphQL"
+    - generic [ref=e10]:
+      - button "Gerando…" [disabled] [ref=e27]
+      - status [ref=e28]: Chamando a IA — isso pode levar alguns segundos.
+  - button "Open Next.js Dev Tools" [ref=e17] [cursor=pointer]:
+    - img [ref=e18]
+  - alert [ref=e21]

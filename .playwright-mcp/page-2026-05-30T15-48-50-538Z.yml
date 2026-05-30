@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - heading "Gerar currículo" [level=1] [ref=e3]
+    - paragraph [ref=e4]:
+      - text: A IA monta um currículo usando apenas itens reais da sua base — nunca inventa. A saída é um arquivo
+      - code [ref=e5]: .tex
+      - text: para compilar no Overleaf.
+    - tablist "Modo de geração" [ref=e6]:
+      - tab "Currículo padrão" [ref=e7] [cursor=pointer]
+      - tab "Adaptar à vaga" [selected] [ref=e8] [cursor=pointer]
+    - paragraph [ref=e9]: "Modo adaptativo: cole o texto da vaga e a IA prioriza, reordena e reescreve só os itens reais que casam com ela — omitindo o que a vaga pede e você não tem."
+    - generic [ref=e22]:
+      - generic [ref=e23]: Texto da vaga
+      - textbox "Texto da vaga" [ref=e24]:
+        - /placeholder: Cole aqui a descrição completa da vaga (responsabilidades, requisitos, etc.).
+        - text: "Vaga: Engenheiro(a) de Software Backend Sênior — Fintech de Pagamentos Buscamos uma pessoa engenheira de backend para atuar em sistemas distribuídos de alta escala no domínio de pagamentos. Responsabilidades: - Projetar e manter APIs de pagamento em Go com PostgreSQL - Otimizar custos de infraestrutura e desempenho de sistemas distribuídos - Trabalhar com mensageria assíncrona e processamento de filas - Liderar tecnicamente um time de engenheiros Requisitos obrigatórios: - Experiência sólida com Go e bancos de dados relacionais (PostgreSQL) - Vivência com sistemas distribuídos e arquitetura orientada a eventos Diferenciais (não obrigatórios): - Kubernetes, AWS, Python, Apache Kafka, React, GraphQL"
+    - button "Adaptar à vaga" [ref=e29] [cursor=pointer]
+    - region "Currículo adaptado à vaga (.tex)" [ref=e30]:
+      - generic [ref=e31]:
+        - heading "Currículo adaptado à vaga (.tex)" [level=2] [ref=e32]
+        - generic [ref=e33]:
+          - button "Copiar" [ref=e34] [cursor=pointer]
+          - link "Baixar .tex" [ref=e35] [cursor=pointer]:
+            - /url: /api/resumes/cmpsizi0u0003w5msqlwxildw/download
+      - code [ref=e37]: "\\documentclass{resume} \\usepackage[left=0.4in,top=0.4in,right=0.4in,bottom=0.4in]{geometry} \\name{Mariana Costa} \\address{Curitiba, BR \\textbar\\ \\href{mailto:mariana.costa@exemplo.com}{mariana.costa@exemplo.com}} \\address{\\href{https://linkedin.com/in/marianacosta}{LinkedIn}} \\begin{document} \\begin{rSection}{OBJECTIVE} Engenheira de software backend com experiência em sistemas distribuídos e liderança técnica. \\end{rSection} \\begin{rSection}{Education} \\textbf{Universidade Federal do Parana} \\hfill 2014 - 2019\\\\ Bacharelado, Ciencia da Computacao \\end{rSection} \\begin{rSection}{SKILLS} \\begin{tabular}{ @{} >{\\bfseries}l @{\\hspace{6ex}} l } \\textbf{Linguagens} & Go, TypeScript\\\\ \\textbf{Bancos} & PostgreSQL\\\\ \\end{tabular} \\end{rSection} \\begin{rSection}{EXPERIENCE} \\textbf{Nuvem Sistemas} \\hfill Curitiba, BR\\\\ Engenheira de Software Senior \\hfill Março de 2021 - Atual \\begin{itemize} \\itemsep -3pt {} \\item Reduziu custo de infraestrutura em 22\\% migrando para filas assíncronas \\item Liderou time de engenheiros na API de pagamentos \\end{itemize} \\end{rSection} \\end{document}"
+  - button "Open Next.js Dev Tools" [ref=e17] [cursor=pointer]:
+    - img [ref=e18]
+  - alert [ref=e21]
