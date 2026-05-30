@@ -8,6 +8,10 @@
 // o repositório persiste tudo num upsert transacional, reindexando `order` pela
 // posição. Estados (spec §2.1): carregando, vazio (CTA), preenchido, salvando,
 // erro de validação (400 com details do Zod), salvo, erro.
+//
+// Fatia 4 (US-10): só a camada visual mudou — Tailwind + componentes do DS
+// (cabeçalho em .card, 6 listas via ListSection, savebar fixa, estados visuais).
+// A lógica de load/save/validação e o contrato congelado permanecem idênticos.
 
 import { useEffect, useState } from "react";
 import {
@@ -22,6 +26,8 @@ import {
   type Course,
 } from "@/lib/schemas";
 import { ListSection, type FieldDef } from "@/components/perfil/ListSection";
+import { Icon } from "@/components/Icon";
+import { countBaseItems } from "@/lib/presentation/base-stats";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
@@ -36,64 +42,71 @@ const HEADER_FIELDS: {
   required?: boolean;
   type?: "text" | "email" | "url" | "textarea";
   placeholder?: string;
+  span2?: boolean;
 }[] = [
-  { key: "fullName", label: "Nome completo", required: true, placeholder: "Maria da Silva" },
-  { key: "email", label: "E-mail", type: "email", placeholder: "maria@exemplo.com" },
-  { key: "phone", label: "Telefone", placeholder: "(11) 99999-0000" },
-  { key: "location", label: "Localização", placeholder: "São Paulo, SP" },
-  { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/in/maria" },
-  { key: "github", label: "GitHub", type: "url", placeholder: "https://github.com/maria" },
-  { key: "website", label: "Website", type: "url", placeholder: "https://maria.dev" },
-  { key: "summary", label: "Resumo / objetivo", type: "textarea", placeholder: "Breve resumo profissional…" },
+  { key: "fullName", label: "Nome completo", required: true, placeholder: "Ex.: Maria Silva", span2: true },
+  { key: "email", label: "E-mail", type: "email", placeholder: "voce@email.com" },
+  { key: "phone", label: "Telefone", placeholder: "+55 11 90000-0000" },
+  { key: "location", label: "Localização", placeholder: "Cidade, UF" },
+  { key: "website", label: "Website", type: "url", placeholder: "site.com" },
+  { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "linkedin.com/in/voce" },
+  { key: "github", label: "GitHub", type: "url", placeholder: "github.com/voce" },
+  {
+    key: "summary",
+    label: "Resumo / objetivo",
+    type: "textarea",
+    placeholder: "Breve descrição profissional — a IA pode reescrever, nunca inventar.",
+    span2: true,
+  },
 ];
 
 // Definições de campos de cada lista (rótulos PT-BR). `makeEmpty` usa os defaults
 // do schema (current=false, bullets/techStack=[], order=0 — o order é reindexado
 // no servidor pela posição, então o valor aqui é irrelevante).
 const EXPERIENCE_FIELDS: FieldDef<Experience>[] = [
-  { key: "company", label: "Empresa", required: true },
   { key: "role", label: "Cargo", required: true },
-  { key: "location", label: "Local" },
-  { key: "startDate", label: "Início", required: true, placeholder: "Jan 2022" },
-  { key: "endDate", label: "Fim", placeholder: "Atual" },
+  { key: "company", label: "Empresa", required: true },
+  { key: "location", label: "Local", placeholder: "Cidade, UF ou Remoto" },
   { key: "current", label: "Emprego atual", type: "boolean" },
-  { key: "bullets", label: "Realizações", type: "list" },
+  { key: "startDate", label: "Início", required: true, placeholder: "2023" },
+  { key: "endDate", label: "Fim", placeholder: "2024", disabledWhen: (e) => Boolean(e.current) },
+  { key: "bullets", label: "Realizações", type: "list", span2: true, placeholder: "Uma conquista por linha" },
 ];
 
 const EDUCATION_FIELDS: FieldDef<Education>[] = [
-  { key: "institution", label: "Instituição", required: true },
+  { key: "institution", label: "Instituição", required: true, span2: true },
   { key: "degree", label: "Grau", required: true, placeholder: "Bacharelado" },
   { key: "field", label: "Área", placeholder: "Ciência da Computação" },
-  { key: "startDate", label: "Início", required: true, placeholder: "2018" },
-  { key: "endDate", label: "Fim", placeholder: "2022" },
-  { key: "gpa", label: "Nota / CR" },
-  { key: "details", label: "Detalhes", type: "textarea" },
+  { key: "startDate", label: "Início", required: true, placeholder: "2017" },
+  { key: "endDate", label: "Fim", placeholder: "2021" },
+  { key: "gpa", label: "Nota / CR", placeholder: "8.7/10" },
+  { key: "details", label: "Detalhes", type: "textarea", span2: true, placeholder: "TCC, atividades, honrarias…" },
 ];
 
 const SKILL_FIELDS: FieldDef<Skill>[] = [
-  { key: "category", label: "Categoria", required: true, placeholder: "Técnicas" },
-  { key: "name", label: "Habilidade", required: true, placeholder: "TypeScript" },
+  { key: "category", label: "Categoria", required: true, placeholder: "Linguagens" },
   { key: "level", label: "Nível", placeholder: "Avançado" },
+  { key: "name", label: "Habilidade", required: true, span2: true, placeholder: "Go, TypeScript, SQL…" },
 ];
 
 const PROJECT_FIELDS: FieldDef<Project>[] = [
   { key: "name", label: "Nome", required: true },
-  { key: "description", label: "Descrição", required: true, type: "textarea" },
-  { key: "bullets", label: "Destaques", type: "list" },
-  { key: "techStack", label: "Stack", type: "list" },
-  { key: "url", label: "URL", type: "url" },
+  { key: "url", label: "URL", type: "url", placeholder: "github.com/voce/projeto" },
+  { key: "description", label: "Descrição", required: true, type: "textarea", span2: true },
+  { key: "bullets", label: "Destaques", type: "list", span2: true, placeholder: "Um destaque por linha" },
+  { key: "techStack", label: "Stack", type: "tags", span2: true },
 ];
 
 const LANGUAGE_FIELDS: FieldDef<Language>[] = [
   { key: "name", label: "Idioma", required: true, placeholder: "Inglês" },
-  { key: "proficiency", label: "Proficiência", required: true, placeholder: "Fluente" },
+  { key: "proficiency", label: "Proficiência", required: true, placeholder: "Avançado (C1)" },
 ];
 
 const COURSE_FIELDS: FieldDef<Course>[] = [
-  { key: "title", label: "Título", required: true },
-  { key: "issuer", label: "Emissor", required: true },
-  { key: "date", label: "Data", required: true, placeholder: "Mar 2024" },
-  { key: "url", label: "URL", type: "url" },
+  { key: "title", label: "Título", required: true, span2: true },
+  { key: "issuer", label: "Emissor", required: true, placeholder: "Amazon Web Services" },
+  { key: "date", label: "Data", required: true, placeholder: "2024" },
+  { key: "url", label: "URL", type: "url", span2: true, placeholder: "credencial.com/..." },
 ];
 
 // Estado inicial da tela: bundle vazio. NÃO passa pelo schema porque `fullName: ""`
@@ -139,14 +152,7 @@ export default function PerfilPage() {
   }, []);
 
   const isEmptyBase =
-    status === "ready" &&
-    !bundle.profile.fullName.trim() &&
-    bundle.experiences.length === 0 &&
-    bundle.educations.length === 0 &&
-    bundle.skills.length === 0 &&
-    bundle.projects.length === 0 &&
-    bundle.languages.length === 0 &&
-    bundle.courses.length === 0;
+    status !== "loading" && !bundle.profile.fullName.trim() && countBaseItems(bundle) === 0;
 
   function touch() {
     if (status === "saved" || status === "error") setStatus("ready");
@@ -225,200 +231,230 @@ export default function PerfilPage() {
     return fieldErrors.find((e) => e.path === `profile.${key}`)?.message;
   }
 
+  // Mapa de erros por caminho relativo da lista (`<prefix>.<idx>.<field>`),
+  // consumido pelo ListSection para destacar campos.
+  const errorMap: Record<string, string> = {};
+  for (const e of fieldErrors) errorMap[e.path] = e.message;
+
   if (status === "loading") {
     return (
-      <main style={styles.main}>
-        <h1>Perfil</h1>
-        <p>Carregando sua base de dados…</p>
-      </main>
+      <>
+        <div className="page-head">
+          <h1>Perfil</h1>
+          <p className="sub">
+            Esta é a sua base — a fonte da verdade que alimenta a geração. Tudo que aparece nos
+            currículos sai daqui.
+          </p>
+        </div>
+        <div aria-busy="true" aria-label="Carregando sua base">
+          <div className="skel" style={{ height: 200, width: "100%", borderRadius: 14, marginBottom: 28 }} />
+          <div className="skel" style={{ height: 120, width: "100%", borderRadius: 12, marginBottom: 14 }} />
+          <div className="skel" style={{ height: 120, width: "100%", borderRadius: 12 }} />
+        </div>
+      </>
     );
   }
 
   return (
-    <main style={styles.main}>
-      <h1>Perfil</h1>
-      <p style={styles.subtitle}>
-        Esta é a sua base de dados — a fonte da verdade que alimenta a geração dos
-        currículos. Tudo que aparece nos currículos sai daqui.
-      </p>
+    <>
+      <div className="page-head">
+        <h1>Perfil</h1>
+        <p className="sub">
+          Esta é a sua base — a fonte da verdade que alimenta a geração. Tudo que aparece nos
+          currículos sai daqui.
+        </p>
+      </div>
 
       {isEmptyBase && (
-        <div style={styles.emptyCta} role="status">
-          Sua base ainda está vazia. Preencha o nome completo e ao menos uma experiência ou
-          formação, depois salve para começar.
+        <div className="note note-accent" style={{ marginBottom: 26 }} role="status">
+          <Icon name="info" />
+          <div className="note-body">
+            <p className="note-title">Sua base ainda está vazia</p>
+            <p>Preencha o nome e ao menos uma experiência ou formação, depois salve.</p>
+          </div>
         </div>
       )}
 
-      <section aria-labelledby="cabecalho-heading" style={styles.headerSection}>
-        <h2 id="cabecalho-heading" style={styles.h2}>
-          Cabeçalho e resumo
-        </h2>
-        <div style={styles.fields}>
-          {HEADER_FIELDS.map((f) => {
-            const value = (bundle.profile[f.key] ?? "") as string;
-            const err = headerErrorFor(f.key);
-            const inputId = `field-${f.key}`;
-            return (
-              <div key={f.key} style={styles.field}>
-                <label htmlFor={inputId} style={styles.label}>
-                  {f.label}
-                  {f.required ? <span style={styles.required}> *</span> : null}
-                </label>
-                {f.type === "textarea" ? (
-                  <textarea
-                    id={inputId}
-                    value={value}
-                    placeholder={f.placeholder}
-                    onChange={(e) => updateProfile(f.key, e.target.value)}
-                    rows={4}
-                    style={{ ...styles.input, ...(err ? styles.inputError : {}) }}
-                  />
-                ) : (
-                  <input
-                    id={inputId}
-                    type={f.type ?? "text"}
-                    value={value}
-                    placeholder={f.placeholder}
-                    onChange={(e) => updateProfile(f.key, e.target.value)}
-                    style={{ ...styles.input, ...(err ? styles.inputError : {}) }}
-                  />
-                )}
-                {err ? (
-                  <span role="alert" style={styles.errorText}>
-                    {err}
-                  </span>
-                ) : null}
-              </div>
-            );
-          })}
+      {/* Cabeçalho e resumo */}
+      <section className="sec" style={{ marginTop: 0 }} aria-labelledby="cabecalho-heading">
+        <div className="sec-head2">
+          <h2 id="cabecalho-heading">
+            <span className="sec-ic">
+              <Icon name="user" />
+            </span>
+            Cabeçalho e resumo
+          </h2>
+        </div>
+        <div className="card" style={{ padding: 20 }}>
+          <div className="field-grid">
+            {HEADER_FIELDS.map((f) => {
+              const value = (bundle.profile[f.key] ?? "") as string;
+              const err = headerErrorFor(f.key);
+              const inputId = `field-${f.key}`;
+              return (
+                <div key={f.key} className={"field" + (f.span2 ? " span2" : "")}>
+                  <label className="label" htmlFor={inputId}>
+                    {f.label}
+                    {f.required && <span className="req">*</span>}
+                  </label>
+                  {f.type === "textarea" ? (
+                    <textarea
+                      id={inputId}
+                      className={"input" + (err ? " err" : "")}
+                      value={value}
+                      placeholder={f.placeholder}
+                      onChange={(e) => updateProfile(f.key, e.target.value)}
+                    />
+                  ) : (
+                    <input
+                      id={inputId}
+                      className={"input" + (err ? " err" : "")}
+                      type={f.type ?? "text"}
+                      value={value}
+                      placeholder={f.placeholder}
+                      onChange={(e) => updateProfile(f.key, e.target.value)}
+                    />
+                  )}
+                  {err && (
+                    <span className="help err" role="alert">
+                      {err}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
       <ListSection<Experience>
-        title="Experiência profissional"
-        emptyHint="Nenhuma experiência adicionada ainda."
+        title="Experiência"
+        icon="briefcase"
+        singular="experiência"
+        pathPrefix="experiences"
+        emptyHint="Nenhuma experiência adicionada. Comece pela mais recente."
         items={bundle.experiences}
         fields={EXPERIENCE_FIELDS}
         makeEmpty={() => ({ company: "", role: "", startDate: "", current: false, bullets: [], order: 0 })}
-        summarize={(e) => [e.company, e.role].filter(Boolean).join(" — ")}
+        summarize={(e) => ({
+          title: e.role,
+          meta: [e.company, period(e.startDate, e.endDate, e.current)].filter(Boolean).join(" · "),
+        })}
         onChange={(items) => updateList("experiences", items)}
+        errors={errorMap}
       />
 
       <ListSection<Education>
         title="Formação"
-        emptyHint="Nenhuma formação adicionada ainda."
+        icon="cap"
+        singular="formação"
+        pathPrefix="educations"
+        emptyHint="Nenhuma formação adicionada."
         items={bundle.educations}
         fields={EDUCATION_FIELDS}
         makeEmpty={() => ({ institution: "", degree: "", startDate: "", order: 0 })}
-        summarize={(e) => [e.institution, e.degree].filter(Boolean).join(" — ")}
+        summarize={(e) => ({
+          title: [e.degree, e.field].filter(Boolean).join(", "),
+          meta: [e.institution, period(e.startDate, e.endDate, false)].filter(Boolean).join(" · "),
+        })}
         onChange={(items) => updateList("educations", items)}
+        errors={errorMap}
       />
 
       <ListSection<Skill>
         title="Habilidades"
-        emptyHint="Nenhuma habilidade adicionada ainda."
+        icon="chip"
+        singular="habilidade"
+        pathPrefix="skills"
+        emptyHint="Nenhuma habilidade adicionada. Agrupe por categoria."
         items={bundle.skills}
         fields={SKILL_FIELDS}
         makeEmpty={() => ({ category: "", name: "", order: 0 })}
-        summarize={(s) => [s.category, s.name].filter(Boolean).join(": ")}
+        summarize={(s) => ({ title: s.name, meta: [s.category, s.level].filter(Boolean).join(" · ") })}
         onChange={(items) => updateList("skills", items)}
+        errors={errorMap}
       />
 
       <ListSection<Project>
         title="Projetos"
-        emptyHint="Nenhum projeto adicionado ainda."
+        icon="folder"
+        singular="projeto"
+        pathPrefix="projects"
+        emptyHint="Nenhum projeto adicionado."
         items={bundle.projects}
         fields={PROJECT_FIELDS}
         makeEmpty={() => ({ name: "", description: "", bullets: [], techStack: [], order: 0 })}
-        summarize={(p) => p.name}
+        summarize={(p) => ({ title: p.name, meta: (p.techStack ?? []).join(", ") })}
         onChange={(items) => updateList("projects", items)}
+        errors={errorMap}
       />
 
       <ListSection<Language>
         title="Idiomas"
-        emptyHint="Nenhum idioma adicionado ainda."
+        icon="globe"
+        singular="idioma"
+        pathPrefix="languages"
+        emptyHint="Nenhum idioma adicionado."
         items={bundle.languages}
         fields={LANGUAGE_FIELDS}
         makeEmpty={() => ({ name: "", proficiency: "", order: 0 })}
-        summarize={(l) => [l.name, l.proficiency].filter(Boolean).join(" — ")}
+        summarize={(l) => ({ title: l.name, meta: l.proficiency })}
         onChange={(items) => updateList("languages", items)}
+        errors={errorMap}
       />
 
       <ListSection<Course>
-        title="Cursos e certificações"
-        emptyHint="Nenhum curso adicionado ainda."
+        title="Cursos / Certificações"
+        icon="award"
+        singular="certificação"
+        pathPrefix="courses"
+        emptyHint="Nenhum curso ou certificação adicionado."
         items={bundle.courses}
         fields={COURSE_FIELDS}
         makeEmpty={() => ({ title: "", issuer: "", date: "", order: 0 })}
-        summarize={(c) => [c.title, c.issuer].filter(Boolean).join(" — ")}
+        summarize={(c) => ({ title: c.title, meta: [c.issuer, c.date].filter(Boolean).join(" · ") })}
         onChange={(items) => updateList("courses", items)}
+        errors={errorMap}
       />
 
-      <div style={styles.actions}>
-        <button type="button" onClick={handleSave} disabled={status === "saving"} style={styles.saveButton}>
+      {/* Barra de salvar fixa */}
+      <div className="savebar">
+        <div className="left">
+          {status === "error" ? (
+            <span style={{ color: "var(--danger)" }}>
+              {errorMsg ?? "Corrija os campos destacados antes de salvar."}
+            </span>
+          ) : (
+            "Alterações são salvas na sua base local (fonte da verdade)."
+          )}
+        </div>
+        {status === "saving" && (
+          <span className="sb-status" role="status">
+            <span className="spin" /> Salvando…
+          </span>
+        )}
+        {status === "saved" && (
+          <span className="badge badge-success" role="status">
+            <Icon name="check" size={13} /> Salvo com sucesso
+          </span>
+        )}
+        {status === "error" && (
+          <span className="badge badge-danger">
+            <Icon name="alert" size={13} /> Erro de validação
+          </span>
+        )}
+        <button type="button" className="btn btn-primary" onClick={handleSave} disabled={status === "saving"}>
           {status === "saving" ? "Salvando…" : "Salvar"}
         </button>
-        {status === "saved" && (
-          <span role="status" style={styles.savedMsg}>
-            Salvo com sucesso.
-          </span>
-        )}
-        {status === "error" && errorMsg && (
-          <span role="alert" style={styles.errorMsg}>
-            {errorMsg}
-          </span>
-        )}
       </div>
-    </main>
+    </>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  main: { fontFamily: "system-ui, sans-serif", padding: "2rem", maxWidth: 760, margin: "0 auto" },
-  subtitle: { color: "#555", marginTop: "-0.25rem" },
-  headerSection: { marginTop: "1.5rem" },
-  h2: { fontSize: "1.15rem" },
-  fields: { display: "flex", flexDirection: "column", gap: "1rem", marginTop: "0.75rem" },
-  field: { display: "flex", flexDirection: "column", gap: "0.25rem" },
-  label: { fontWeight: 600, fontSize: "0.9rem" },
-  required: { color: "#c0392b" },
-  input: {
-    padding: "0.5rem 0.625rem",
-    border: "1px solid #ccc",
-    borderRadius: 6,
-    fontSize: "0.95rem",
-    fontFamily: "inherit",
-  },
-  inputError: { borderColor: "#c0392b" },
-  errorText: { color: "#c0392b", fontSize: "0.8rem" },
-  emptyCta: {
-    marginTop: "1rem",
-    padding: "0.75rem 1rem",
-    background: "#eef4ff",
-    border: "1px solid #cdddff",
-    borderRadius: 8,
-    fontSize: "0.9rem",
-  },
-  actions: {
-    display: "flex",
-    alignItems: "center",
-    gap: "1rem",
-    marginTop: "2rem",
-    position: "sticky",
-    bottom: 0,
-    background: "#fff",
-    padding: "1rem 0",
-    borderTop: "1px solid #eee",
-  },
-  saveButton: {
-    padding: "0.6rem 1.25rem",
-    background: "#1a5cff",
-    color: "#fff",
-    border: "none",
-    borderRadius: 8,
-    fontSize: "0.95rem",
-    cursor: "pointer",
-  },
-  savedMsg: { color: "#1e7e34", fontSize: "0.9rem" },
-  errorMsg: { color: "#c0392b", fontSize: "0.9rem" },
-};
+// Monta o período "Início – Fim" / "Início – Atual" para o meta do card (apenas UI).
+function period(start?: string, end?: string, current?: boolean): string {
+  if (!start) return "";
+  if (current) return `${start} – Atual`;
+  if (end) return `${start} – ${end}`;
+  return start;
+}

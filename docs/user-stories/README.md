@@ -36,6 +36,12 @@ mesma fatia, itens sem dependência mútua podem andar em paralelo.
 | [US-08](./US-08-modo2-adaptativo-vaga.md) | Modo 2 adaptativo à vaga | US-05, US-07 |
 | [US-09](./US-09-historico-curriculos.md) | Histórico de currículos | US-05, US-06 |
 
+### Fatia 4 — Polimento visual
+
+| US | Título | Depende de |
+|---|---|---|
+| [US-10](./US-10-redesign-visual-dev-tool.md) | Redesign visual dev-tool (casca + Início + Perfil + Gerar + Currículos), design system, Tailwind, light+dark | US-02..09, ADR-0017 |
+
 ### Grafo de dependência resumido
 
 ```

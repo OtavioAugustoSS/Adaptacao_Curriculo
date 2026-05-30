@@ -12,9 +12,16 @@
 // Pré-requisito: checamos a base (GET /api/profile) só para ORIENTAR/habilitar os
 // botões no cliente; a fonte da verdade é o servidor (422 PREREQUISITE_NOT_MET).
 // Não duplicamos a regra de negócio aqui — apenas espelhamos o ADR-0014 para UX.
+//
+// Fatia 4 (US-10): só a camada visual mudou — Tailwind + componentes do DS. O .tex do
+// preview é o real (resume.texOutput); os avisos vêm de traceabilityReport.warnings
+// (campos reais value/reason/field) em qualquer modo. `errors` nunca aparecem aqui.
 
 import { useEffect, useState } from "react";
 import type { ProfileBundle, GeneratedResume } from "@/lib/schemas";
+import { Icon } from "@/components/Icon";
+import { TexCode } from "@/components/TexCode";
+import { resumeModeLabel, visibleWarnings } from "@/lib/presentation/resume-meta";
 
 // Estados da tela (spec §2.2): ocioso, validando pré-requisito, gerando (loading),
 // preview, erro (com retry).
@@ -61,9 +68,7 @@ export default function GerarPage() {
   // No Modo 2 também é preciso ter colado a vaga (espelha o refine do contrato).
   const jobTextFilled = jobText.trim().length > 0;
   const canSubmit =
-    canGenerate &&
-    status !== "generating" &&
-    (mode === "STANDARD" || jobTextFilled);
+    canGenerate && status !== "generating" && (mode === "STANDARD" || jobTextFilled);
 
   async function handleGenerate() {
     setErrorMsg(null);
@@ -74,9 +79,7 @@ export default function GerarPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          mode === "JOB_ADAPTIVE"
-            ? { mode: "JOB_ADAPTIVE", jobText }
-            : { mode: "STANDARD" },
+          mode === "JOB_ADAPTIVE" ? { mode: "JOB_ADAPTIVE", jobText } : { mode: "STANDARD" },
         ),
       });
 
@@ -108,285 +111,198 @@ export default function GerarPage() {
     }
   }
 
-  if (status === "validating") {
-    return (
-      <main style={styles.main}>
-        <h1>Gerar currículo</h1>
-        <p>Verificando sua base de dados…</p>
-      </main>
-    );
-  }
-
   const generating = status === "generating";
 
   return (
-    <main style={styles.main}>
-      <h1>Gerar currículo</h1>
-      <p style={styles.subtitle}>
-        A IA monta um currículo usando apenas itens reais da sua base — nunca inventa.
-        A saída é um arquivo <code>.tex</code> para compilar no Overleaf.
-      </p>
-
-      {/* Seletor de modo: deixa claro qual fluxo está ativo (Modo 1 x Modo 2). */}
-      <div style={styles.modeTabs} role="tablist" aria-label="Modo de geração">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "STANDARD"}
-          onClick={() => setMode("STANDARD")}
-          disabled={generating}
-          style={{
-            ...styles.modeTab,
-            ...(mode === "STANDARD" ? styles.modeTabActive : {}),
-          }}
-        >
-          Currículo padrão
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "JOB_ADAPTIVE"}
-          onClick={() => setMode("JOB_ADAPTIVE")}
-          disabled={generating}
-          style={{
-            ...styles.modeTab,
-            ...(mode === "JOB_ADAPTIVE" ? styles.modeTabActive : {}),
-          }}
-        >
-          Adaptar à vaga
-        </button>
+    <>
+      <div className="page-head">
+        <h1>Gerar currículo</h1>
+        <p className="sub">
+          A IA monta um currículo usando apenas itens reais da sua base — nunca inventa. A saída é
+          um arquivo <span className="mono">.tex</span> para compilar no Overleaf.
+        </p>
       </div>
 
-      <p style={styles.modeHint}>
-        {mode === "STANDARD"
-          ? "Modo padrão: um currículo geral cobrindo seu perfil completo."
-          : "Modo adaptativo: cole o texto da vaga e a IA prioriza, reordena e reescreve só os itens reais que casam com ela — omitindo o que a vaga pede e você não tem."}
-      </p>
-
-      {!canGenerate && (
-        <div style={styles.warningCta} role="status">
-          Sua base ainda não atende ao mínimo para gerar: preencha o nome e ao menos
-          uma experiência ou formação em <strong>Perfil</strong>.
+      {/* Validando pré-requisitos: skeleton de preview. */}
+      {status === "validating" && (
+        <div aria-busy="true" aria-label="Verificando sua base">
+          <div className="skel" style={{ height: 44, width: 280, borderRadius: 10, marginBottom: 16 }} />
+          <div className="skel" style={{ height: 16, width: "60%", borderRadius: 6, marginBottom: 28 }} />
+          <div className="skel" style={{ height: 300, width: "100%", borderRadius: 10 }} />
         </div>
       )}
 
-      {/* Modo 2: campo grande para colar a vaga. */}
-      {mode === "JOB_ADAPTIVE" && (
-        <div style={styles.jobField}>
-          <label htmlFor="jobText" style={styles.jobLabel}>
-            Texto da vaga
-          </label>
-          <textarea
-            id="jobText"
-            value={jobText}
-            onChange={(e) => setJobText(e.target.value)}
-            disabled={generating}
-            placeholder="Cole aqui a descrição completa da vaga (responsabilidades, requisitos, etc.)."
-            rows={12}
-            style={styles.jobTextarea}
-          />
-          {!jobTextFilled && (
-            <span style={styles.muted}>
-              Cole a descrição da vaga para habilitar a adaptação.
-            </span>
-          )}
-        </div>
-      )}
-
-      <div style={styles.actions}>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={!canSubmit}
-          style={{
-            ...styles.primaryButton,
-            ...(!canSubmit ? styles.buttonDisabled : {}),
-          }}
-        >
-          {generating
-            ? "Gerando…"
-            : mode === "JOB_ADAPTIVE"
-              ? "Adaptar à vaga"
-              : "Gerar currículo padrão"}
-        </button>
-
-        {generating && (
-          <span role="status" style={styles.muted}>
-            Chamando a IA — isso pode levar alguns segundos.
-          </span>
-        )}
-      </div>
-
-      {status === "error" && errorMsg && (
-        <div style={styles.errorBox} role="alert">
-          <p style={{ margin: 0 }}>{errorMsg}</p>
-          <button type="button" onClick={handleGenerate} style={styles.retryButton}>
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
-      {status === "preview" && resume && (
-        <section aria-labelledby="preview-heading" style={styles.previewSection}>
-          <div style={styles.previewHeader}>
-            <h2 id="preview-heading" style={styles.h2}>
-              {resume.mode === "JOB_ADAPTIVE"
-                ? "Currículo adaptado à vaga (.tex)"
-                : "Currículo gerado (.tex)"}
-            </h2>
-            <div style={styles.previewButtons}>
-              <button type="button" onClick={handleCopy} style={styles.secondaryButton}>
-                {copied ? "Copiado!" : "Copiar"}
-              </button>
-              <a
-                href={`/api/resumes/${resume.id}/download`}
-                style={styles.downloadLink}
-                download
-              >
-                Baixar .tex
-              </a>
-            </div>
-          </div>
-          {resume.traceabilityReport &&
-            resume.traceabilityReport.warnings.length > 0 && (
-              <div style={styles.warningsBox} role="status">
-                <strong>Avisos de rastreabilidade</strong>
-                <p style={styles.warningsHint}>
-                  A IA usou apenas itens da sua base, mas estes pontos merecem
-                  revisão — confira se números/itens conferem antes de enviar.
+      {status !== "validating" && (
+        <>
+          {/* Base insuficiente. */}
+          {!canGenerate && (
+            <div className="note note-warning" style={{ marginBottom: 24 }}>
+              <Icon name="alert" />
+              <div className="note-body">
+                <p className="note-title">Base insuficiente</p>
+                <p>
+                  Sua base ainda não atende ao mínimo: preencha o nome e ao menos uma experiência ou
+                  formação em <a href="/perfil">Perfil</a>.
                 </p>
-                <ul style={styles.warningsList}>
-                  {resume.traceabilityReport.warnings.map((w, i) => (
-                    <li key={i}>
-                      <code>{w.value}</code> — {w.reason}{" "}
-                      <span style={styles.muted}>({w.field})</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
+            </div>
+          )}
+
+          {/* Seletor de modo (Modo 1 x Modo 2). */}
+          <div className="tabs" role="tablist" aria-label="Modo de geração">
+            <button
+              type="button"
+              className="tab"
+              role="tab"
+              aria-selected={mode === "STANDARD"}
+              onClick={() => setMode("STANDARD")}
+              disabled={generating}
+            >
+              <Icon name="file" /> Currículo padrão
+            </button>
+            <button
+              type="button"
+              className="tab"
+              role="tab"
+              aria-selected={mode === "JOB_ADAPTIVE"}
+              onClick={() => setMode("JOB_ADAPTIVE")}
+              disabled={generating}
+            >
+              <Icon name="spark" /> Adaptar à vaga
+            </button>
+          </div>
+          <p className="gen-mode-hint">
+            {mode === "STANDARD"
+              ? "Gera um currículo completo a partir de toda a sua base, sem foco em uma vaga específica."
+              : "Reordena e prioriza os itens da sua base de acordo com a vaga — sem inventar nada."}
+          </p>
+
+          {/* Modo 2: campo grande para colar a vaga. */}
+          {mode === "JOB_ADAPTIVE" && (
+            <div className="gen-block">
+              <div className="field">
+                <label className="label" htmlFor="jobText">
+                  Texto da vaga
+                </label>
+                <textarea
+                  id="jobText"
+                  className="input"
+                  style={{ minHeight: 280 }}
+                  value={jobText}
+                  onChange={(e) => setJobText(e.target.value)}
+                  disabled={generating}
+                  placeholder="Cole aqui a descrição completa da vaga (responsabilidades, requisitos, etc.)."
+                />
+                <span className="help">Cole a descrição da vaga para habilitar a adaptação.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Ações. */}
+          <div className="gen-actions">
+            {generating ? (
+              <>
+                <button type="button" className="btn btn-primary btn-lg" disabled>
+                  <span className="spin" /> Gerando…
+                </button>
+                <span className="muted" role="status">
+                  Chamando a IA — pode levar alguns segundos.
+                </span>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary btn-lg"
+                disabled={!canSubmit}
+                onClick={handleGenerate}
+              >
+                <Icon name="spark" /> {mode === "JOB_ADAPTIVE" ? "Adaptar à vaga" : "Gerar currículo padrão"}
+              </button>
             )}
-          <pre style={styles.codeBlock}>
-            <code>{resume.texOutput}</code>
-          </pre>
-        </section>
+            {mode === "JOB_ADAPTIVE" && !jobTextFilled && canGenerate && !generating && (
+              <span className="muted">Cole a vaga para habilitar.</span>
+            )}
+          </div>
+
+          {/* Erro do LLM. */}
+          {status === "error" && errorMsg && (
+            <div className="note note-danger" style={{ marginTop: 24 }} role="alert">
+              <Icon name="alert" />
+              <div className="note-body">
+                <p className="note-title">Não foi possível gerar o currículo</p>
+                <p>{errorMsg} Sua base está intacta — tente novamente em alguns instantes.</p>
+                <div style={{ marginTop: 12 }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleGenerate}>
+                    <Icon name="retry" /> Tentar novamente
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preview do resultado. */}
+          {status === "preview" && resume && (
+            <section className="preview" aria-labelledby="preview-heading">
+              <div className="preview-head">
+                <h2 id="preview-heading">
+                  <Icon name="file" /> {resumeModeLabel(resume.mode)} (.tex)
+                </h2>
+                <div className="preview-actions">
+                  <button type="button" className="btn btn-secondary" onClick={handleCopy}>
+                    {copied ? (
+                      <>
+                        <Icon name="check" /> Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="copy" /> Copiar
+                      </>
+                    )}
+                  </button>
+                  <a className="btn btn-primary" href={`/api/resumes/${resume.id}/download`} download>
+                    <Icon name="download" /> Baixar .tex
+                  </a>
+                </div>
+              </div>
+
+              {/* Avisos de rastreabilidade — em qualquer modo, só warnings (errors nunca). */}
+              {visibleWarnings(resume.traceabilityReport).length > 0 && (
+                <div className="avisos">
+                  <div className="note note-warning">
+                    <Icon name="alert" />
+                    <div className="note-body">
+                      <p className="note-title">
+                        {visibleWarnings(resume.traceabilityReport).length}{" "}
+                        {visibleWarnings(resume.traceabilityReport).length === 1
+                          ? "item a revisar"
+                          : "itens a revisar"}
+                      </p>
+                      <p>
+                        A IA reescreveu e condensou alguns trechos. Nada foi inventado — confira se
+                        cada ajuste reflete a realidade antes de enviar.
+                      </p>
+                      <ul className="aviso-list">
+                        {visibleWarnings(resume.traceabilityReport).map((w, i) => (
+                          <li className="aviso" key={i}>
+                            <span className="av-num">{String(i + 1).padStart(2, "0")}</span>
+                            <div>
+                              <span className="av-val">{w.value}</span>
+                              <p className="av-reason">{w.reason}</p>
+                              <div className="av-field">{w.field}</div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <TexCode tex={resume.texOutput} />
+            </section>
+          )}
+        </>
       )}
-    </main>
+    </>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  main: { fontFamily: "system-ui, sans-serif", padding: "2rem", maxWidth: 820, margin: "0 auto" },
-  subtitle: { color: "#555", marginTop: "-0.25rem" },
-  h2: { fontSize: "1.15rem", margin: 0 },
-  modeTabs: { display: "flex", gap: "0.5rem", marginTop: "1.5rem" },
-  modeTab: {
-    padding: "0.5rem 1rem",
-    background: "#fff",
-    color: "#1a5cff",
-    border: "1px solid #1a5cff",
-    borderRadius: 8,
-    fontSize: "0.9rem",
-    cursor: "pointer",
-  },
-  modeTabActive: { background: "#1a5cff", color: "#fff" },
-  modeHint: { color: "#555", fontSize: "0.9rem", marginTop: "0.75rem" },
-  jobField: { display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "1rem" },
-  jobLabel: { fontWeight: 600, fontSize: "0.9rem" },
-  jobTextarea: {
-    width: "100%",
-    padding: "0.75rem",
-    border: "1px solid #ccc",
-    borderRadius: 8,
-    fontSize: "0.9rem",
-    fontFamily: "inherit",
-    resize: "vertical",
-    boxSizing: "border-box",
-  },
-  actions: { display: "flex", alignItems: "center", gap: "1rem", marginTop: "1.5rem" },
-  primaryButton: {
-    padding: "0.6rem 1.25rem",
-    background: "#1a5cff",
-    color: "#fff",
-    border: "none",
-    borderRadius: 8,
-    fontSize: "0.95rem",
-    cursor: "pointer",
-  },
-  buttonDisabled: { background: "#9bb6ff", cursor: "not-allowed" },
-  secondaryButton: {
-    padding: "0.4rem 0.9rem",
-    background: "#fff",
-    color: "#1a5cff",
-    border: "1px solid #1a5cff",
-    borderRadius: 6,
-    fontSize: "0.85rem",
-    cursor: "pointer",
-  },
-  downloadLink: {
-    padding: "0.4rem 0.9rem",
-    background: "#1a5cff",
-    color: "#fff",
-    borderRadius: 6,
-    fontSize: "0.85rem",
-    textDecoration: "none",
-  },
-  retryButton: {
-    marginTop: "0.5rem",
-    padding: "0.4rem 0.9rem",
-    background: "#c0392b",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    fontSize: "0.85rem",
-    cursor: "pointer",
-  },
-  muted: { color: "#777", fontSize: "0.9rem" },
-  warningCta: {
-    marginTop: "1rem",
-    padding: "0.75rem 1rem",
-    background: "#fff7e6",
-    border: "1px solid #ffe0a3",
-    borderRadius: 8,
-    fontSize: "0.9rem",
-  },
-  errorBox: {
-    marginTop: "1.5rem",
-    padding: "0.75rem 1rem",
-    background: "#fdecea",
-    border: "1px solid #f5c2bb",
-    borderRadius: 8,
-    fontSize: "0.9rem",
-    color: "#a02118",
-  },
-  warningsBox: {
-    marginTop: "1rem",
-    padding: "0.75rem 1rem",
-    background: "#fff7e6",
-    border: "1px solid #ffe0a3",
-    borderRadius: 8,
-    fontSize: "0.9rem",
-  },
-  warningsHint: { margin: "0.25rem 0 0.5rem", color: "#7a5b00" },
-  warningsList: { margin: 0, paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: "0.25rem" },
-  previewSection: { marginTop: "2rem" },
-  previewHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "1rem",
-    flexWrap: "wrap",
-  },
-  previewButtons: { display: "flex", alignItems: "center", gap: "0.5rem" },
-  codeBlock: {
-    marginTop: "0.75rem",
-    padding: "1rem",
-    background: "#0d1117",
-    color: "#e6edf3",
-    borderRadius: 8,
-    fontSize: "0.8rem",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    overflowX: "auto",
-    maxHeight: 520,
-    whiteSpace: "pre",
-  },
-};

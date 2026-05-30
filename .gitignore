@@ -27,3 +27,10 @@ coverage/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Playwright / verification artifacts (evidência de smoke test, não conteúdo do projeto)
+.playwright-mcp/
+mode2-smoke-result.png
+
+# Claude Design handoff (rascunho de referência da Fatia 4 — não é código do projeto)
+design-ref/
