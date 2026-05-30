@@ -29,6 +29,7 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0016](0016-modo2-historico-escopo-mvp.md) | Modo 2 (US-08) e histórico (US-09): decisões de escopo do MVP | Accepted |
 | [0017](0017-tailwind-css-mapeamento-tokens-fatia-4.md) | Tailwind CSS na Fatia 4: setup no Next 15 + mapeamento dos tokens do DS | Accepted |
 | [0018](0018-import-perfil-dump-education-current.md) | Fatia 5: import de perfil por dump + `Education.current` | Accepted |
+| [0019](0019-import-perfil-por-arquivo.md) | Fatia 6: importar currículo por arquivo (PDF/DOCX/TXT) | Accepted |
 
 ## Template padrão de ADR
 

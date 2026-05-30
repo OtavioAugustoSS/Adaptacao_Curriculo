@@ -49,6 +49,12 @@ mesma fatia, itens sem dependência mútua podem andar em paralelo.
 | [US-11](./US-11-importar-perfil-dump-ia.md) | Importar perfil por dump com IA (painel "Importar com IA" no `/perfil`, merge no formulário, não persiste) | US-02, US-03, US-04, ADR-0018 |
 | [US-12](./US-12-formacao-em-andamento.md) | Formação "em andamento" (toggle "Cursando", `Education.current`, `.tex` mostra "Atual") | US-02, US-03, US-01, ADR-0018 |
 
+### Fatia 6 — Import por arquivo (IA)
+
+| US | Título | Depende de |
+|---|---|---|
+| [US-13](./US-13-importar-curriculo-arquivo-ia.md) | Importar currículo por arquivo (PDF/DOCX/TXT) com IA — estende a US-11; `POST /api/profile/import/file`, extração no servidor (`unpdf`+`mammoth`), merge no formulário, sem OCR (PDF-imagem → 422) | US-11, US-02, US-03, US-04, ADR-0019 |
+
 ### Grafo de dependência resumido
 
 ```

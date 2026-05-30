@@ -13,7 +13,7 @@
 // (cabeçalho em .card, 6 listas via ListSection, savebar fixa, estados visuais).
 // A lógica de load/save/validação e o contrato congelado permanecem idênticos.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ProfileBundleSchema,
   type ProfileBundle,
@@ -28,6 +28,11 @@ import {
 import { ListSection, type FieldDef } from "@/components/perfil/ListSection";
 import { Icon } from "@/components/Icon";
 import { countBaseItems } from "@/lib/presentation/base-stats";
+import {
+  IMPORT_FILE_ACCEPT,
+  MAX_IMPORT_FILE_BYTES,
+  isAcceptedImportFile,
+} from "@/lib/import-file";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
@@ -140,6 +145,13 @@ export default function PerfilPage() {
   const [dumpText, setDumpText] = useState("");
   const [importStatus, setImportStatus] = useState<ImportStatus>("idle");
   const [importError, setImportError] = useState<string | null>(null);
+
+  // Import por ARQUIVO (US-13): mesmo painel, entrada paralela à textarea. Estados
+  // próprios para não interferir no fluxo de texto. O ref permite limpar o input no sucesso.
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileStatus, setFileStatus] = useState<ImportStatus>("idle");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -280,6 +292,57 @@ export default function PerfilPage() {
     }
   }
 
+  // US-13 — importa a partir de um ARQUIVO (PDF/DOCX/TXT): pré-valida tipo/tamanho no
+  // cliente (erro amigável imediato), envia o arquivo em multipart e, no sucesso, MESCLA
+  // o rascunho com o MESMO mergeDraft do fluxo de texto. Em erro NÃO altera o bundle.
+  async function handleImportFile(file: File) {
+    if (fileStatus === "sending") return;
+    setFileError(null);
+
+    if (!isAcceptedImportFile(file.name, file.type)) {
+      setFileError("Tipo de arquivo não suportado. Envie um PDF, DOCX ou TXT.");
+      setFileStatus("error");
+      return;
+    }
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      setFileError("Arquivo muito grande (limite de 8 MB).");
+      setFileStatus("error");
+      return;
+    }
+
+    setFileStatus("sending");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      // NÃO setar Content-Type manualmente: o browser monta o boundary do multipart.
+      const res = await fetch("/api/profile/import/file", { method: "POST", body: fd });
+
+      if (!res.ok) {
+        let msg = "Não foi possível interpretar o arquivo. Tente novamente.";
+        try {
+          const body = await res.json();
+          if (typeof body?.error?.message === "string") msg = body.error.message;
+        } catch {
+          /* resposta sem corpo JSON: mantém a mensagem padrão */
+        }
+        setFileError(msg);
+        setFileStatus("error");
+        return; // em erro NÃO altera o bundle
+      }
+
+      const draft = (await res.json()) as ProfileBundle;
+      setBundle((prev) => mergeDraft(prev, draft));
+      setFileName(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setFileStatus("idle");
+      setImportOpen(false);
+      touch(); // marca como alterado para o usuário revisar e salvar
+    } catch {
+      setFileError("Falha de conexão ao importar. Tente novamente.");
+      setFileStatus("error");
+    }
+  }
+
   function headerErrorFor(key: string): string | undefined {
     return fieldErrors.find((e) => e.path === `profile.${key}`)?.message;
   }
@@ -344,16 +407,17 @@ export default function PerfilPage() {
             onClick={() => setImportOpen((v) => !v)}
             aria-expanded={importOpen}
           >
-            {importOpen ? "Recolher" : "Colar um texto"}
+            {importOpen ? "Recolher" : "Colar texto ou enviar arquivo"}
           </button>
         </div>
 
         {importOpen && (
           <div className="card" style={{ padding: 20 }}>
             <p className="sub" style={{ marginTop: 0 }}>
-              Cole um currículo antigo, seu perfil do LinkedIn ou anotações. A IA estrutura essas
-              informações no formulário abaixo para você revisar. Nada é salvo automaticamente, e a
-              IA usa apenas o que está no texto — não inventa.
+              Cole um texto (currículo antigo, perfil do LinkedIn, anotações) ou envie um arquivo
+              (PDF, DOCX ou TXT). A IA estrutura essas informações no formulário abaixo para você
+              revisar. Nada é salvo automaticamente, e a IA usa apenas o que está no conteúdo
+              enviado — não inventa.
             </p>
             <div className="field">
               <label className="label" htmlFor="import-dump">
@@ -389,6 +453,73 @@ export default function PerfilPage() {
               {importStatus === "sending" && (
                 <span className="sb-status" role="status">
                   <span className="spin" /> Interpretando o texto…
+                </span>
+              )}
+            </div>
+
+            {/* Entrada por ARQUIVO (US-13): paralela à textarea, mesmo pipeline de IA. */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                margin: "20px 0 16px",
+                color: "var(--muted)",
+                fontSize: 13,
+              }}
+              aria-hidden="true"
+            >
+              <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+              ou
+              <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="import-file">
+                Enviar um arquivo (PDF, DOCX ou TXT)
+              </label>
+              <input
+                id="import-file"
+                ref={fileInputRef}
+                type="file"
+                className="input"
+                accept={IMPORT_FILE_ACCEPT}
+                disabled={fileStatus === "sending"}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setFileName(f ? f.name : null);
+                  setFileError(null);
+                  if (fileStatus === "error") setFileStatus("idle");
+                }}
+              />
+            </div>
+            {fileStatus === "error" && fileError && (
+              <div className="note note-danger" style={{ marginTop: 14 }} role="alert">
+                <Icon name="alert" />
+                <div className="note-body">
+                  <p>{fileError}</p>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const f = fileInputRef.current?.files?.[0];
+                  if (f) void handleImportFile(f);
+                }}
+                disabled={fileStatus === "sending" || !fileName}
+              >
+                {fileStatus === "sending" ? "Enviando…" : "Enviar arquivo"}
+              </button>
+              {fileName && fileStatus !== "sending" && (
+                <span className="sub" style={{ margin: 0 }}>
+                  {fileName}
+                </span>
+              )}
+              {fileStatus === "sending" && (
+                <span className="sb-status" role="status">
+                  <span className="spin" /> Lendo o arquivo e interpretando…
                 </span>
               )}
             </div>

@@ -4,7 +4,17 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-30 — **Fatia 5 (ADR-0018)** — três mudanças **aditivas**, o
+> Última alteração: 2026-05-30 — **Fatia 6 (ADR-0019)** — nova rota
+> **`POST /api/profile/import/file`** (`multipart/form-data`, campo `file`); response
+> **`ProfileBundleSchema`** (mesmo rascunho **tolerante** da Fatia 5, **NÃO persistido**;
+> reusa `ImportProfileBundleSchema` — **sem mudança de schema**). Extração de texto **no
+> servidor** (`unpdf` p/ PDF + `mammoth` p/ DOCX + TXT nativo) → reusa o **EXISTENTE**
+> `extractProfileFromDump`. Validação por whitelist de tipo + limite de tamanho (corpo é
+> binário, sem schema Zod). **Sem OCR**: PDF digitalizado/imagem → **422** orientando a colar
+> o texto. A rota `/api/profile/import` (texto) e o `ResumeContentSchema` **NÃO mudam**;
+> invariante extração ≠ geração mantido (ADR-0018).
+>
+> 2026-05-30 — **Fatia 5 (ADR-0018)** — três mudanças **aditivas**, o
 > contrato segue governado pelo gate do architect: (1) campo novo `current: boolean`
 > (`z.boolean().default(false)`) em `EducationSchema` — espelha `Experience.current`, sem
 > backfill; (2) rota nova **`POST /api/profile/import`** — request `{ rawText: string }`
@@ -54,6 +64,7 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 | GET | `/api/profile` | — | `ProfileBundleSchema` | Lê a base de dados completa do usuário atual. |
 | PUT | `/api/profile` | `ProfileBundleSchema` | `ProfileBundleSchema` | Cria/atualiza a base completa (upsert). |
 | POST | `/api/profile/import` | `ProfileImportRequestSchema` (`{ rawText }`) | `ProfileBundleSchema` | Estrutura um dump de texto livre em um **rascunho** da base (LLM extrai, **não persiste**) para o usuário revisar. Variante tolerante no adapter (`fullName` pode vir vazio); `502` em `LLMError`. ADR-0018. |
+| POST | `/api/profile/import/file` | `multipart/form-data` (campo `file`) | `ProfileBundleSchema` | Extrai o texto de um arquivo (PDF/DOCX/TXT) **no servidor** e reusa o **mesmo** pipeline da `/import` → rascunho tolerante **não persistido**. Sem schema Zod (corpo binário): whitelist de tipo + limite de tamanho. `400` (sem arquivo), `415` (tipo), `413` (tamanho), `422` (texto vazio — PDF imagem, sem OCR), `502` (`LLMError`). ADR-0019. |
 | POST | `/api/resumes/generate` | `GenerateRequestSchema` | `GeneratedResumeSchema` | Gera currículo (Modo 1 ou 2): LLM → render → guardrail → persiste. |
 | GET | `/api/resumes` | — | `GeneratedResumeSchema[]` | Lista o histórico de currículos gerados. |
 | GET | `/api/resumes/[id]/download` | — | `text/plain` (`.tex`) | Baixa o `.tex` cacheado (`Content-Disposition: attachment`). |
