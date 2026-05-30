@@ -36,6 +36,7 @@ export const EducationSchema = z.object({
   field: z.string().optional(),
   startDate: z.string().min(1),
   endDate: z.string().optional(),
+  current: z.boolean().default(false),
   gpa: z.string().optional(),
   details: z.string().optional(),
   order: z.number().int().min(0).default(0),

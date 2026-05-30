@@ -32,6 +32,7 @@ function makeBundle(overrides: Partial<ProfileBundle> = {}): ProfileBundle {
         institution: "USP",
         degree: "BSc",
         startDate: "2014",
+        current: false,
         order: 0,
       },
     ],

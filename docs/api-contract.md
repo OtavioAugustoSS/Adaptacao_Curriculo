@@ -4,7 +4,18 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-30 — §2: o status **422** passa a cobrir também
+> Última alteração: 2026-05-30 — **Fatia 5 (ADR-0018)** — três mudanças **aditivas**, o
+> contrato segue governado pelo gate do architect: (1) campo novo `current: boolean`
+> (`z.boolean().default(false)`) em `EducationSchema` — espelha `Experience.current`, sem
+> backfill; (2) rota nova **`POST /api/profile/import`** — request `{ rawText: string }`
+> (`min 1`), response **`ProfileBundleSchema`** (rascunho **NÃO persistido**, devolvido ao
+> formulário; reusa o schema existente, com variante tolerante de validação no adapter — o
+> `fullName` pode vir vazio no rascunho, mas o `PUT /api/profile` segue **estrito**); (3) extensão
+> **ADITIVA** do `LLMProvider` com `extractProfileFromDump(params): Promise<ProfileBundle>`
+> (não toca `generateResumeContent`). O `ResumeContentSchema` **permanece congelado** — "Atual" na
+> Formação sai do LLM formatando `period` (igual a `Experience`), sem novo campo no schema do
+> guardrail. O `validate-traceability.ts` **não se aplica** ao import (extração ≠ geração).
+> 2026-05-30 — §2: o status **422** passa a cobrir também
 > "pré-requisito de base não atendido" (`code: PREREQUISITE_NOT_MET`) na rota
 > `POST /api/resumes/generate`, além de falha de guardrail/regeneração (ADR-0014).
 > Ampliação de semântica de status; **nenhum schema muda** — contrato segue congelado.
@@ -27,6 +38,8 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 - `ProfileBundleSchema` — `Profile` + todas as listas acima (a base de dados completa
   serializada; é o input do LLM).
 - `JobPostingSchema` — `{ rawText, title?, company? }`.
+- `ProfileImportRequestSchema` — `{ rawText: string }` (`min 1`); request do import por dump
+  (ADR-0018). A resposta reusa `ProfileBundleSchema` (rascunho não persistido).
 - `ResumeContentSchema` — **saída estruturada do LLM** (ver §3).
 - `GenerateRequestSchema` — `{ mode: "STANDARD" | "JOB_ADAPTIVE", jobText?: string }`
   (`jobText` obrigatório quando `mode === "JOB_ADAPTIVE"`).
@@ -40,6 +53,7 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 |---|---|---|---|---|
 | GET | `/api/profile` | — | `ProfileBundleSchema` | Lê a base de dados completa do usuário atual. |
 | PUT | `/api/profile` | `ProfileBundleSchema` | `ProfileBundleSchema` | Cria/atualiza a base completa (upsert). |
+| POST | `/api/profile/import` | `ProfileImportRequestSchema` (`{ rawText }`) | `ProfileBundleSchema` | Estrutura um dump de texto livre em um **rascunho** da base (LLM extrai, **não persiste**) para o usuário revisar. Variante tolerante no adapter (`fullName` pode vir vazio); `502` em `LLMError`. ADR-0018. |
 | POST | `/api/resumes/generate` | `GenerateRequestSchema` | `GeneratedResumeSchema` | Gera currículo (Modo 1 ou 2): LLM → render → guardrail → persiste. |
 | GET | `/api/resumes` | — | `GeneratedResumeSchema[]` | Lista o histórico de currículos gerados. |
 | GET | `/api/resumes/[id]/download` | — | `text/plain` (`.tex`) | Baixa o `.tex` cacheado (`Content-Disposition: attachment`). |

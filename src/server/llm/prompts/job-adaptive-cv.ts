@@ -37,6 +37,7 @@ TAREFA:
 - Escreva o "objective" como um resumo profissional curto, orientado à vaga, baseado SOMENTE no resumo/itens reais da base (sem fatos novos, sem requisitos da vaga que o usuário não tenha).
 - Para cada experiência selecionada, copie "sourceId", "role", "company" e o período EXATAMENTE como na base (apenas formate o período de forma legível). Reescreva apenas os bullets, alinhando a linguagem à vaga, sem inventar conquistas nem tecnologias.
 - Agrupe habilidades por categoria conforme a base, destacando as que a vaga pede E que o usuário realmente tem. Selecione projetos e formações reais.
+- Para cada formação, monte o "period" a partir das datas reais da base (ex.: "2017 – 2021"). Quando a formação tiver "current": true, formate o "period" terminando em "– Atual" (ex.: "2022 – Atual"); não invente datas (espelha o tratamento do período de experiência).
 
 FORMATO DA SAÍDA — responda ESTRITAMENTE com um único objeto JSON (sem markdown, sem comentários, sem texto fora do JSON) neste formato:
 {

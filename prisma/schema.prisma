@@ -79,6 +79,7 @@ model Education {
   field       String?
   startDate   String
   endDate     String?
+  current     Boolean @default(false)
   gpa         String?
   details     String?
   order       Int     @default(0)

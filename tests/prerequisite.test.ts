@@ -32,6 +32,7 @@ const SAMPLE_EDUCATION = {
   institution: "USP",
   degree: "BSc",
   startDate: "2018",
+  current: false,
   order: 0,
 };
 

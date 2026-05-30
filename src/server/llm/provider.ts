@@ -7,7 +7,7 @@
 // VALIDADO pelo `ResumeContentSchema`, NUNCA `.tex` cru e NUNCA texto livre. A
 // validação Zod dentro do adapter é a fronteira de confiança real.
 
-import type { ResumeContent } from "@/lib/schemas";
+import type { ResumeContent, ProfileBundle } from "@/lib/schemas";
 
 /**
  * Parâmetros de uma geração de conteúdo de currículo.
@@ -29,6 +29,22 @@ export interface GenerateResumeParams {
 }
 
 /**
+ * Parâmetros de uma EXTRAÇÃO de perfil a partir de um dump de texto livre (US-11, ADR-0018).
+ *
+ * Mesma forma de `GenerateResumeParams` (system/user/modelId): os prompts são montados FORA
+ * desta camada (`prompts/parse-dump.ts`) e entram como strings. É um tipo separado por clareza
+ * de intenção — extração estrutura o PRÓPRIO texto do usuário, não gera currículo a partir da base.
+ */
+export interface GenerateProfileParams {
+  /** Prompt de sistema: "ESTRUTURE só o texto do usuário; NÃO invente/infira; deixe vazio o que faltar". */
+  system: string;
+  /** Prompt de usuário: o `rawText` do dump + o formato-alvo (`ProfileBundle` sem ids). */
+  user: string;
+  /** Id do modelo (opcional): resolvido por `MODEL_ID`/catálogo se ausente (ADR-0004). */
+  modelId?: string;
+}
+
+/**
  * Seam de acesso ao LLM. Implementações: `NimProvider` (`nim.ts`).
  * Os testes mockam ESTA interface para isolar o orquestrador do transporte.
  */
@@ -41,6 +57,23 @@ export interface LLMProvider {
    *                    ou `validation` (saída não-conforme ao schema → 502, sem retry).
    */
   generateResumeContent(params: GenerateResumeParams): Promise<ResumeContent>;
+
+  /**
+   * Extrai um RASCUNHO de perfil a partir de um dump de texto livre do usuário (US-11, ADR-0018).
+   *
+   * Extensão ADITIVA: NÃO altera `generateResumeContent`. EXTRAÇÃO ≠ GERAÇÃO — aqui a IA estrutura
+   * o PRÓPRIO texto do usuário na base; não há base de referência, então o guardrail de
+   * rastreabilidade (`validate-traceability.ts`) NÃO se aplica. A proteção é o prompt restritivo
+   * ("não invente") + a revisão humana antes de persistir. O rascunho NÃO é persistido aqui.
+   *
+   * @returns `ProfileBundle` validado contra `ProfileBundleSchema` no adapter, em variante
+   *          TOLERANTE para o rascunho do import: o `fullName` pode vir vazio (dump sem nome não
+   *          deve dar 502 espúrio). A obrigatoriedade do nome fica no `PUT /api/profile` (estrito).
+   *          Ids ausentes são esperados (gerados no save). Ver ADR-0018 §5.
+   * @throws {LLMError} `transport` (rede/credencial/timeout/5xx esgotado → 502)
+   *                    ou `validation` (saída não-conforme ao bundle → 502, sem retry).
+   */
+  extractProfileFromDump(params: GenerateProfileParams): Promise<ProfileBundle>;
 }
 
 /**

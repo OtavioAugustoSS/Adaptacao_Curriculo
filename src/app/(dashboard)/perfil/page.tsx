@@ -77,8 +77,9 @@ const EDUCATION_FIELDS: FieldDef<Education>[] = [
   { key: "institution", label: "Instituição", required: true, span2: true },
   { key: "degree", label: "Grau", required: true, placeholder: "Bacharelado" },
   { key: "field", label: "Área", placeholder: "Ciência da Computação" },
+  { key: "current", label: "Cursando (em andamento)", type: "boolean" },
   { key: "startDate", label: "Início", required: true, placeholder: "2017" },
-  { key: "endDate", label: "Fim", placeholder: "2021" },
+  { key: "endDate", label: "Fim", placeholder: "2021", disabledWhen: (e) => Boolean(e.current) },
   { key: "gpa", label: "Nota / CR", placeholder: "8.7/10" },
   { key: "details", label: "Detalhes", type: "textarea", span2: true, placeholder: "TCC, atividades, honrarias…" },
 ];
@@ -124,11 +125,21 @@ function emptyBundle(): ProfileBundle {
   };
 }
 
+// Estado do painel "Importar com IA" (US-11). O import NÃO persiste — devolve um
+// rascunho que MESCLAMOS no formulário; o usuário revisa e usa o "Salvar" normal.
+type ImportStatus = "idle" | "sending" | "error";
+
 export default function PerfilPage() {
   const [bundle, setBundle] = useState<ProfileBundle>(emptyBundle());
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
+
+  // Painel de import por dump (US-11): colapsável, texto livre, estados próprios.
+  const [importOpen, setImportOpen] = useState(false);
+  const [dumpText, setDumpText] = useState("");
+  const [importStatus, setImportStatus] = useState<ImportStatus>("idle");
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -227,6 +238,48 @@ export default function PerfilPage() {
     }
   }
 
+  // US-11 — importa um rascunho da IA e MESCLA no bundle atual (nada é apagado):
+  // - listas: ACRESCENTA os itens do rascunho aos existentes (concatena);
+  // - cabeçalho: preenche cada campo só se o atual estiver VAZIO (não sobrescreve).
+  // O resultado fica no formulário para o usuário revisar e usar o "Salvar" normal.
+  async function handleImport() {
+    const rawText = dumpText.trim();
+    if (!rawText || importStatus === "sending") return;
+    setImportStatus("sending");
+    setImportError(null);
+
+    try {
+      const res = await fetch("/api/profile/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText }),
+      });
+
+      if (!res.ok) {
+        let msg = "Não foi possível interpretar o texto. Tente novamente.";
+        try {
+          const body = await res.json();
+          if (typeof body?.error?.message === "string") msg = body.error.message;
+        } catch {
+          /* resposta sem corpo JSON: mantém a mensagem padrão */
+        }
+        setImportError(msg);
+        setImportStatus("error");
+        return; // em erro NÃO altera o bundle
+      }
+
+      const draft = (await res.json()) as ProfileBundle;
+      setBundle((prev) => mergeDraft(prev, draft));
+      setDumpText("");
+      setImportStatus("idle");
+      setImportOpen(false);
+      touch(); // marca como alterado para o usuário revisar e salvar
+    } catch {
+      setImportError("Falha de conexão ao importar. Tente novamente.");
+      setImportStatus("error");
+    }
+  }
+
   function headerErrorFor(key: string): string | undefined {
     return fieldErrors.find((e) => e.path === `profile.${key}`)?.message;
   }
@@ -274,6 +327,74 @@ export default function PerfilPage() {
           </div>
         </div>
       )}
+
+      {/* Importar com IA (US-11): cola um texto livre, a IA estrutura um rascunho que
+          MESCLAMOS no formulário. Não persiste — o usuário revisa e usa o "Salvar". */}
+      <section className="sec" style={{ marginTop: 0, marginBottom: 26 }} aria-labelledby="import-heading">
+        <div className="sec-head2">
+          <h2 id="import-heading">
+            <span className="sec-ic">
+              <Icon name="spark" />
+            </span>
+            Importar com IA
+          </h2>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setImportOpen((v) => !v)}
+            aria-expanded={importOpen}
+          >
+            {importOpen ? "Recolher" : "Colar um texto"}
+          </button>
+        </div>
+
+        {importOpen && (
+          <div className="card" style={{ padding: 20 }}>
+            <p className="sub" style={{ marginTop: 0 }}>
+              Cole um currículo antigo, seu perfil do LinkedIn ou anotações. A IA estrutura essas
+              informações no formulário abaixo para você revisar. Nada é salvo automaticamente, e a
+              IA usa apenas o que está no texto — não inventa.
+            </p>
+            <div className="field">
+              <label className="label" htmlFor="import-dump">
+                Seu texto
+              </label>
+              <textarea
+                id="import-dump"
+                className="input"
+                style={{ minHeight: 160 }}
+                value={dumpText}
+                placeholder="Cole aqui o texto com suas experiências, formação, habilidades…"
+                onChange={(e) => setDumpText(e.target.value)}
+                disabled={importStatus === "sending"}
+              />
+            </div>
+            {importStatus === "error" && importError && (
+              <div className="note note-danger" style={{ marginTop: 14 }} role="alert">
+                <Icon name="alert" />
+                <div className="note-body">
+                  <p>{importError}</p>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleImport}
+                disabled={importStatus === "sending" || dumpText.trim().length === 0}
+              >
+                {importStatus === "sending" ? "Preenchendo…" : "Preencher com IA"}
+              </button>
+              {importStatus === "sending" && (
+                <span className="sb-status" role="status">
+                  <span className="spin" /> Interpretando o texto…
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Cabeçalho e resumo */}
       <section className="sec" style={{ marginTop: 0 }} aria-labelledby="cabecalho-heading">
@@ -352,10 +473,10 @@ export default function PerfilPage() {
         emptyHint="Nenhuma formação adicionada."
         items={bundle.educations}
         fields={EDUCATION_FIELDS}
-        makeEmpty={() => ({ institution: "", degree: "", startDate: "", order: 0 })}
+        makeEmpty={() => ({ institution: "", degree: "", startDate: "", current: false, order: 0 })}
         summarize={(e) => ({
           title: [e.degree, e.field].filter(Boolean).join(", "),
-          meta: [e.institution, period(e.startDate, e.endDate, false)].filter(Boolean).join(" · "),
+          meta: [e.institution, period(e.startDate, e.endDate, e.current)].filter(Boolean).join(" · "),
         })}
         onChange={(items) => updateList("educations", items)}
         errors={errorMap}
@@ -457,4 +578,41 @@ function period(start?: string, end?: string, current?: boolean): string {
   if (current) return `${start} – Atual`;
   if (end) return `${start} – ${end}`;
   return start;
+}
+
+// MESCLA o rascunho do import (US-11) no bundle atual, sem perder nada:
+// - as 6 listas: concatena (os itens do rascunho vão DEPOIS dos existentes);
+// - o cabeçalho: cada campo só é preenchido se o atual estiver vazio (não sobrescreve).
+function mergeDraft(current: ProfileBundle, draft: ProfileBundle): ProfileBundle {
+  // Preenche um campo opcional do cabeçalho só quando o atual está vazio/ausente.
+  const fillIfEmpty = (cur?: string, next?: string): string | undefined => {
+    const c = (cur ?? "").trim();
+    if (c) return cur;
+    const n = (next ?? "").trim();
+    return n ? next : cur;
+  };
+
+  const profile: Profile = {
+    ...current.profile,
+    fullName: current.profile.fullName.trim()
+      ? current.profile.fullName
+      : draft.profile.fullName ?? current.profile.fullName,
+    phone: fillIfEmpty(current.profile.phone, draft.profile.phone),
+    location: fillIfEmpty(current.profile.location, draft.profile.location),
+    email: fillIfEmpty(current.profile.email, draft.profile.email),
+    linkedin: fillIfEmpty(current.profile.linkedin, draft.profile.linkedin),
+    github: fillIfEmpty(current.profile.github, draft.profile.github),
+    website: fillIfEmpty(current.profile.website, draft.profile.website),
+    summary: fillIfEmpty(current.profile.summary, draft.profile.summary),
+  };
+
+  return {
+    profile,
+    experiences: [...current.experiences, ...draft.experiences],
+    educations: [...current.educations, ...draft.educations],
+    skills: [...current.skills, ...draft.skills],
+    projects: [...current.projects, ...draft.projects],
+    languages: [...current.languages, ...draft.languages],
+    courses: [...current.courses, ...draft.courses],
+  };
 }

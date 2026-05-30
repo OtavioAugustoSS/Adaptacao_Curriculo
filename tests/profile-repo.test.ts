@@ -277,4 +277,60 @@ describe("saveProfileBundle — serialização e contrato de escrita", () => {
     expect(upsertArg.create.phone).toBeNull();
     expect(upsertArg.create.email).toBeNull();
   });
+
+  it("deve gravar o `current` da formação como veio no bundle (US-12)", async () => {
+    stubReadbackEmpty();
+    prismaMock.profile.upsert.mockResolvedValue({ id: "p1" });
+
+    await saveProfileBundle({
+      profile: { fullName: "Otávio" },
+      experiences: [],
+      educations: [
+        {
+          institution: "USP",
+          degree: "Mestrado",
+          startDate: "2022",
+          current: true,
+          order: 0,
+        },
+      ],
+      skills: [],
+      projects: [],
+      languages: [],
+      courses: [],
+    });
+
+    // A formação em andamento (US-12) é persistida com current=true (sem perder o flag).
+    const arg = prismaMock.education.createMany.mock.calls[0][0];
+    expect(arg.data[0].current).toBe(true);
+  });
+});
+
+describe("getProfileBundle — round-trip do `current` da formação (US-12)", () => {
+  it("deve desserializar o `current` da formação vindo do Prisma", async () => {
+    prismaMock.profile.findUnique.mockResolvedValue(
+      makeProfileRow({
+        educations: [
+          {
+            id: "ed1",
+            userId: "user-local",
+            profileId: "p1",
+            institution: "USP",
+            degree: "Mestrado",
+            field: null,
+            startDate: "2022",
+            endDate: null,
+            current: true,
+            gpa: null,
+            details: null,
+            order: 0,
+          },
+        ],
+      }),
+    );
+
+    const bundle = await getProfileBundle();
+
+    expect(bundle.educations[0].current).toBe(true);
+  });
 });

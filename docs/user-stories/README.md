@@ -42,6 +42,13 @@ mesma fatia, itens sem dependência mútua podem andar em paralelo.
 |---|---|---|
 | [US-10](./US-10-redesign-visual-dev-tool.md) | Redesign visual dev-tool (casca + Início + Perfil + Gerar + Currículos), design system, Tailwind, light+dark | US-02..09, ADR-0017 |
 
+### Fatia 5 — Import por dump (IA) + Formação em andamento
+
+| US | Título | Depende de |
+|---|---|---|
+| [US-11](./US-11-importar-perfil-dump-ia.md) | Importar perfil por dump com IA (painel "Importar com IA" no `/perfil`, merge no formulário, não persiste) | US-02, US-03, US-04, ADR-0018 |
+| [US-12](./US-12-formacao-em-andamento.md) | Formação "em andamento" (toggle "Cursando", `Education.current`, `.tex` mostra "Atual") | US-02, US-03, US-01, ADR-0018 |
+
 ### Grafo de dependência resumido
 
 ```

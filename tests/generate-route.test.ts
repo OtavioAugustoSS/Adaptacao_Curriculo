@@ -80,6 +80,7 @@ const BUNDLE_EDU_ONLY: ProfileBundle = {
       institution: "USP",
       degree: "BSc",
       startDate: "2018",
+      current: false,
       order: 0,
     },
   ],

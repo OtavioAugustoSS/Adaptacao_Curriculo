@@ -18,8 +18,17 @@
 
 import OpenAI from "openai";
 import { z } from "zod";
-import { ResumeContentSchema, type ResumeContent } from "@/lib/schemas";
-import type { GenerateResumeParams, LLMProvider } from "./provider";
+import {
+  ResumeContentSchema,
+  ImportProfileBundleSchema,
+  type ResumeContent,
+  type ProfileBundle,
+} from "@/lib/schemas";
+import type {
+  GenerateResumeParams,
+  GenerateProfileParams,
+  LLMProvider,
+} from "./provider";
 import { LLMError } from "./provider";
 import { resolveModel } from "./models";
 
@@ -33,6 +42,9 @@ const MAX_TRANSPORT_RETRIES = 2;
  */
 const JSON_SCHEMA_NAME = "ResumeContent";
 
+/** Nome do response_format json_schema do import de perfil (US-11). */
+const PROFILE_BUNDLE_JSON_SCHEMA_NAME = "ProfileBundle";
+
 /**
  * JSON Schema derivado do `ResumeContentSchema` (Zod 4 nativo — sem dependência
  * nova; ADR-0012). Calculado uma vez no carregamento do módulo. Usado só como
@@ -42,6 +54,15 @@ const RESUME_CONTENT_JSON_SCHEMA = z.toJSONSchema(ResumeContentSchema) as Record
   string,
   unknown
 >;
+
+/**
+ * JSON Schema derivado da variante TOLERANTE do bundle (`ImportProfileBundleSchema`,
+ * ADR-0018 §5) — guia a saída do import. Mesma técnica/papel do schema acima:
+ * RESTRIÇÃO de geração; a validação real é o `safeParse` do Zod (tolerante).
+ */
+const PROFILE_BUNDLE_JSON_SCHEMA = z.toJSONSchema(
+  ImportProfileBundleSchema,
+) as Record<string, unknown>;
 
 /**
  * Lê e valida as envs do provedor. Falha cedo com mensagem clara se faltarem —
@@ -174,5 +195,92 @@ export class NimProvider implements LLMProvider {
     }
 
     return result.data;
+  }
+
+  /**
+   * Extrai um RASCUNHO de perfil a partir de um dump de texto livre (US-11, ADR-0018).
+   * Espelha `generateResumeContent` (mesmo transporte/política de erro), mas com DOIS
+   * pontos distintos: (1) o `response_format` json_schema deriva de
+   * `ImportProfileBundleSchema`; (2) a validação da saída usa a variante TOLERANTE
+   * (`fullName` pode vir vazio — ADR-0018 §5), para que um dump sem nome não vire 502
+   * espúrio. A obrigatoriedade do nome fica no `PUT /api/profile` (estrito).
+   */
+  async extractProfileFromDump(
+    params: GenerateProfileParams,
+  ): Promise<ProfileBundle> {
+    const model = resolveModel(params.modelId);
+
+    // response_format: json_schema quando o modelo suporta; senão fallback json_object
+    // (ADR-0012). `strict: false` pela mesma razão da geração (campos `.optional()`).
+    const responseFormat: OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"] =
+      model.supportsJsonSchema
+        ? {
+            type: "json_schema",
+            json_schema: {
+              name: PROFILE_BUNDLE_JSON_SCHEMA_NAME,
+              schema: PROFILE_BUNDLE_JSON_SCHEMA,
+              strict: false,
+            },
+          }
+        : { type: "json_object" };
+
+    // --- Transporte: chamada ao provedor (retry/timeout nativos do SDK) --------
+    let raw: string | null | undefined;
+    try {
+      const completion = await this.client.chat.completions.create({
+        model: model.id,
+        messages: [
+          { role: "system", content: params.system },
+          { role: "user", content: params.user },
+        ],
+        response_format: responseFormat,
+      });
+      raw = completion.choices[0]?.message?.content;
+    } catch (err) {
+      if (isTransportError(err)) {
+        throw new LLMError(
+          "transport",
+          "Falha ao comunicar com o provedor de IA (NIM).",
+          err,
+        );
+      }
+      throw new LLMError(
+        "transport",
+        "Erro inesperado ao chamar o provedor de IA.",
+        err,
+      );
+    }
+
+    // --- Validação: parse + Zod TOLERANTE (SEM retry — propaga validação) ------
+    if (!raw) {
+      throw new LLMError(
+        "validation",
+        "O provedor de IA retornou uma resposta vazia.",
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      throw new LLMError(
+        "validation",
+        "A saída do modelo não é JSON válido.",
+        err,
+      );
+    }
+
+    const result = ImportProfileBundleSchema.safeParse(parsed);
+    if (!result.success) {
+      throw new LLMError(
+        "validation",
+        "A saída do modelo não está conforme o formato de perfil (ProfileBundle).",
+        result.error,
+      );
+    }
+
+    // A variante tolerante difere do `ProfileBundle` só por `fullName` poder ser ""
+    // (que é um `string` válido); o rascunho é estruturalmente um ProfileBundle.
+    return result.data as ProfileBundle;
   }
 }

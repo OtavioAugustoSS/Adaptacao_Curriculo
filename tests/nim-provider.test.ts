@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import OpenAI from "openai";
 import { NimProvider } from "@/server/llm/nim";
 import { LLMError } from "@/server/llm/provider";
-import type { ResumeContent } from "@/lib/schemas";
+import type { ResumeContent, ProfileBundle } from "@/lib/schemas";
 
 // Testes de COMPORTAMENTO do adapter NIM (US-04, ADR-0012/0013).
 // O cliente `openai` é a FRONTEIRA de transporte: injetamos um duble pelo
@@ -181,5 +181,100 @@ describe("NimProvider — escolha de response_format pelo flag do modelo", () =>
       response_format: { type: string };
     };
     expect(payload.response_format.type).toBe("json_object");
+  });
+});
+
+describe("NimProvider.extractProfileFromDump — import por dump (US-11, ADR-0018)", () => {
+  // Um rascunho de ProfileBundle que um modelo "bem-comportado" devolveria a partir
+  // de um dump. SEM ids (gerados só no save) e com uma formação em andamento.
+  const VALID_DRAFT: ProfileBundle = {
+    profile: { fullName: "Otávio" },
+    experiences: [],
+    educations: [
+      { institution: "USP", degree: "Mestrado", startDate: "2022", current: true, order: 0 },
+    ],
+    skills: [],
+    projects: [],
+    languages: [],
+    courses: [],
+  };
+
+  it("deve retornar o ProfileBundle validado quando a saída casa com o bundle", async () => {
+    const { client } = makeFakeClient(async () =>
+      chatResponse(JSON.stringify(VALID_DRAFT)),
+    );
+    const provider = new NimProvider(client);
+
+    const result = await provider.extractProfileFromDump(PARAMS);
+
+    expect(result.profile.fullName).toBe("Otávio");
+    expect(result.educations[0].current).toBe(true);
+  });
+
+  it("deve ACEITAR um rascunho com fullName vazio (variante tolerante, ADR-0018 §5)", async () => {
+    // Um dump sem nome (lista de skills, anotações) é extração legítima -> NÃO é 502.
+    const { client } = makeFakeClient(async () =>
+      chatResponse(
+        JSON.stringify({
+          profile: { fullName: "" },
+          skills: [{ category: "Linguagens", name: "TypeScript" }],
+        }),
+      ),
+    );
+    const provider = new NimProvider(client);
+
+    const result = await provider.extractProfileFromDump(PARAMS);
+
+    expect(result.profile.fullName).toBe("");
+    expect(result.skills[0].name).toBe("TypeScript");
+  });
+
+  it("deve lançar LLMError('validation') quando a saída não casa com o bundle, sem retry", async () => {
+    // JSON válido, mas estruturalmente fora do bundle (educations não é um array).
+    const { client, create } = makeFakeClient(async () =>
+      chatResponse(JSON.stringify({ profile: { fullName: "X" }, educations: "nope" })),
+    );
+    const provider = new NimProvider(client);
+
+    const err = await provider.extractProfileFromDump(PARAMS).catch((e) => e);
+    expect(err).toBeInstanceOf(LLMError);
+    expect(err.kind).toBe("validation");
+    // Validação NÃO faz retry no adapter (ADR-0012/0018): só uma chamada ao provedor.
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("deve lançar LLMError('transport') quando o SDK falha no transporte do import", async () => {
+    const apiError = new OpenAI.APIError(
+      502,
+      { error: { message: "bad gateway" } },
+      "bad gateway",
+      undefined,
+    );
+    const { client } = makeFakeClient(async () => {
+      throw apiError;
+    });
+    const provider = new NimProvider(client);
+
+    const err = await provider.extractProfileFromDump(PARAMS).catch((e) => e);
+    expect(err).toBeInstanceOf(LLMError);
+    expect(err.kind).toBe("transport");
+  });
+
+  it("deve usar response_format json_schema 'ProfileBundle' para um modelo com suporte", async () => {
+    const { client, create } = makeFakeClient(async () =>
+      chatResponse(JSON.stringify(VALID_DRAFT)),
+    );
+    const provider = new NimProvider(client);
+
+    await provider.extractProfileFromDump({
+      ...PARAMS,
+      modelId: "meta/llama-3.3-70b-instruct",
+    });
+
+    const payload = create.mock.calls[0][0] as {
+      response_format: { type: string; json_schema?: { name: string } };
+    };
+    expect(payload.response_format.type).toBe("json_schema");
+    expect(payload.response_format.json_schema?.name).toBe("ProfileBundle");
   });
 });

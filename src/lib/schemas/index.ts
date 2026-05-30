@@ -3,6 +3,7 @@
 // Ver docs/api-contract.md.
 
 export * from "./profile";
+export * from "./profile-import";
 export * from "./job";
 export * from "./resume-content";
 export * from "./generate";
