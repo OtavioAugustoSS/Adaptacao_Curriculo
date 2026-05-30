@@ -16,6 +16,9 @@ vi.mock("@/server/data/profile-repo", () => ({ getProfileBundle }));
 const createGeneratedResume = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/resume-repo", () => ({ createGeneratedResume }));
 
+const createJobPosting = vi.hoisted(() => vi.fn());
+vi.mock("@/server/data/job-repo", () => ({ createJobPosting }));
+
 const generateResumeContent = vi.hoisted(() => vi.fn());
 vi.mock("@/server/llm", () => ({
   getLLMProvider: () => ({ generateResumeContent }),
@@ -135,13 +138,24 @@ describe("POST /api/resumes/generate — validação do request", () => {
     expect(json.error.code).toBe("VALIDATION_ERROR");
   });
 
-  it("deve responder 400 VALIDATION_ERROR para JOB_ADAPTIVE sem jobText (Zod antes do modo)", async () => {
+  it("deve responder 400 VALIDATION_ERROR para JOB_ADAPTIVE sem jobText (Zod)", async () => {
     // O refine de GenerateRequestSchema exige jobText não-vazio no Modo 2: a
-    // validação do contrato falha (400) ANTES de chegar ao 422 MODE_NOT_IMPLEMENTED.
+    // validação do contrato falha (400) antes de qualquer acesso a dados/LLM.
     const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE" }));
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error.code).toBe("VALIDATION_ERROR");
+    expect(getProfileBundle).not.toHaveBeenCalled();
+    expect(createJobPosting).not.toHaveBeenCalled();
+    expect(generateResumeContent).not.toHaveBeenCalled();
+  });
+
+  it("deve responder 400 VALIDATION_ERROR para JOB_ADAPTIVE com jobText só de espaços", async () => {
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: "   " }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error.code).toBe("VALIDATION_ERROR");
+    expect(createJobPosting).not.toHaveBeenCalled();
   });
 });
 
@@ -376,11 +390,241 @@ describe("POST /api/resumes/generate — erro inesperado (500)", () => {
   });
 });
 
-describe("POST /api/resumes/generate — Modo 2 ainda não implementado", () => {
-  it("deve responder 422 MODE_NOT_IMPLEMENTED para JOB_ADAPTIVE", async () => {
-    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: "vaga X" }));
+describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
+  const JOB_TEXT = "Vaga: Backend em Node, foco em testes e qualidade.";
+
+  it("deve criar o JobPosting, gerar e persistir GeneratedResume com mode + jobPostingId", async () => {
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-1", rawText: JOB_TEXT });
+    // CONTENT é rastreável à BUNDLE_OK (exp-1/Acme) -> guardrail passa.
+    generateResumeContent.mockResolvedValue(CONTENT);
+    createGeneratedResume.mockImplementation(
+      async (input: {
+        texOutput: string;
+        modelId: string;
+        mode: string;
+        jobPostingId: string | null;
+      }) => ({
+        id: "gr-job",
+        userId: "user-local",
+        mode: input.mode,
+        jobPostingId: input.jobPostingId,
+        modelId: input.modelId,
+        contentJson: CONTENT,
+        texOutput: input.texOutput,
+        traceabilityReport: { errors: [], warnings: [] },
+        createdAt: new Date("2026-05-30T00:00:00.000Z"),
+      }),
+    );
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.mode).toBe("JOB_ADAPTIVE");
+    expect(json.jobPostingId).toBe("job-1");
+
+    // Persistiu a vaga a partir do rawText (ADR-0016).
+    expect(createJobPosting).toHaveBeenCalledTimes(1);
+    expect(createJobPosting.mock.calls[0][0]).toEqual({ rawText: JOB_TEXT });
+
+    // Persistiu o currículo com o modo e o id da vaga.
+    const saveArg = createGeneratedResume.mock.calls[0][0];
+    expect(saveArg.mode).toBe("JOB_ADAPTIVE");
+    expect(saveArg.jobPostingId).toBe("job-1");
+    expect(saveArg.content).toEqual(CONTENT);
+  });
+
+  it("deve responder 422 PREREQUISITE_NOT_MET sem criar JobPosting nem chamar o LLM", async () => {
+    getProfileBundle.mockResolvedValue(BUNDLE_EMPTY);
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error.code).toBe("MODE_NOT_IMPLEMENTED");
+    expect(json.error.code).toBe("PREREQUISITE_NOT_MET");
+    // Pré-requisito barra antes de persistir a vaga ou chamar o modelo.
+    expect(createJobPosting).not.toHaveBeenCalled();
+    expect(generateResumeContent).not.toHaveBeenCalled();
+    expect(createGeneratedResume).not.toHaveBeenCalled();
+  });
+
+  it("deve regenerar 1x e responder 422 GUARDRAIL_FAILED sem persistir o currículo", async () => {
+    // Conteúdo com entidade fora da base (empresa que não casa com exp-1) -> erro forte.
+    const CONTENT_HALLUCINATED: ResumeContent = {
+      objective: "Resumo",
+      education: [],
+      skills: [],
+      experience: [
+        {
+          sourceId: "exp-1",
+          role: "Dev",
+          company: "Empresa Fantasma",
+          period: "2020",
+          bullets: [],
+        },
+      ],
+      projects: [],
+    };
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-2", rawText: JOB_TEXT });
+    generateResumeContent.mockResolvedValue(CONTENT_HALLUCINATED);
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("GUARDRAIL_FAILED");
+    expect(generateResumeContent).toHaveBeenCalledTimes(2);
+    expect(createGeneratedResume).not.toHaveBeenCalled();
+  });
+
+  it("deve responder 502 quando o provider lança LLMError, sem persistir o currículo", async () => {
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-3", rawText: JOB_TEXT });
+    generateResumeContent.mockRejectedValue(
+      new LLMError("transport", "provedor caiu"),
+    );
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error.code).toBe("LLM_ERROR");
+    expect(createGeneratedResume).not.toHaveBeenCalled();
+  });
+
+  it("deve regenerar 1x no Modo 2 e, recuperando na 2ª, criar o JobPosting UMA só vez", async () => {
+    // O guardrail é compartilhado entre os modos (generateWithGuardrail recebe a
+    // função geradora). Aqui confirmamos que o Modo 2 também REGENERA quando a 1ª
+    // tentativa alucina — e que o efeito colateral (persistir a vaga) acontece UMA
+    // vez, FORA do loop de regeneração (a vaga é o insumo, não a saída regenerada).
+    const CONTENT_HALLUCINATED: ResumeContent = {
+      objective: "Resumo",
+      education: [],
+      skills: [],
+      experience: [
+        {
+          sourceId: "exp-1",
+          role: "Dev",
+          company: "Empresa Fantasma",
+          period: "2020",
+          bullets: [],
+        },
+      ],
+      projects: [],
+    };
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-4", rawText: JOB_TEXT });
+    // 1ª tentativa alucinada, 2ª limpa -> regenera e passa.
+    generateResumeContent
+      .mockResolvedValueOnce(CONTENT_HALLUCINATED)
+      .mockResolvedValueOnce(CONTENT);
+    createGeneratedResume.mockImplementation(
+      async (input: {
+        texOutput: string;
+        modelId: string;
+        mode: string;
+        jobPostingId: string | null;
+      }) => ({
+        id: "gr-job-regen",
+        userId: "user-local",
+        mode: input.mode,
+        jobPostingId: input.jobPostingId,
+        modelId: input.modelId,
+        contentJson: CONTENT,
+        texOutput: input.texOutput,
+        traceabilityReport: { errors: [], warnings: [] },
+        createdAt: new Date("2026-05-30T00:00:00.000Z"),
+      }),
+    );
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    expect(res.status).toBe(200);
+    // Regenerou (2 chamadas ao LLM)…
+    expect(generateResumeContent).toHaveBeenCalledTimes(2);
+    // …mas a vaga foi persistida só UMA vez (fora do loop) e o currículo, uma vez.
+    expect(createJobPosting).toHaveBeenCalledTimes(1);
+    expect(createGeneratedResume).toHaveBeenCalledTimes(1);
+    expect(createGeneratedResume.mock.calls[0][0].jobPostingId).toBe("job-4");
+  });
+
+  it("deve enviar a vaga ao LLM (prompt do Modo 2, não o do Modo 1)", async () => {
+    // Guarda contra uma regressão sutil: a rota ligar o gerador errado (standard) no
+    // Modo 2. O Modo 2 deve chamar o provider com um prompt que carrega o texto da
+    // vaga; se usasse o gerador do Modo 1, a vaga nunca chegaria ao modelo.
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-5", rawText: JOB_TEXT });
+    generateResumeContent.mockResolvedValue(CONTENT);
+    createGeneratedResume.mockImplementation(
+      async (input: {
+        texOutput: string;
+        modelId: string;
+        mode: string;
+        jobPostingId: string | null;
+      }) => ({
+        id: "gr-job-prompt",
+        userId: "user-local",
+        mode: input.mode,
+        jobPostingId: input.jobPostingId,
+        modelId: input.modelId,
+        contentJson: CONTENT,
+        texOutput: input.texOutput,
+        traceabilityReport: { errors: [], warnings: [] },
+        createdAt: new Date("2026-05-30T00:00:00.000Z"),
+      }),
+    );
+
+    await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    const params = generateResumeContent.mock.calls[0][0];
+    // O user prompt do Modo 2 carrega a vaga + a base (id real que vira sourceId).
+    expect(params.user).toContain(JOB_TEXT);
+    expect(params.user).toContain("exp-1");
+  });
+
+  it("deve persistir jobPostingId null quando a vaga criada não traz id (fallback ?? null)", async () => {
+    // A rota faz `jobPosting.id ?? null`. Se o repo devolver um registro sem id,
+    // o currículo ainda é gerado e persiste jobPostingId = null (não undefined).
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ rawText: JOB_TEXT });
+    generateResumeContent.mockResolvedValue(CONTENT);
+    createGeneratedResume.mockImplementation(
+      async (input: {
+        texOutput: string;
+        modelId: string;
+        mode: string;
+        jobPostingId: string | null;
+      }) => ({
+        id: "gr-job-noid",
+        userId: "user-local",
+        mode: input.mode,
+        jobPostingId: input.jobPostingId,
+        modelId: input.modelId,
+        contentJson: CONTENT,
+        texOutput: input.texOutput,
+        traceabilityReport: { errors: [], warnings: [] },
+        createdAt: new Date("2026-05-30T00:00:00.000Z"),
+      }),
+    );
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    expect(res.status).toBe(200);
+    expect(createGeneratedResume.mock.calls[0][0].jobPostingId).toBeNull();
+  });
+
+  it("deve responder 400 VALIDATION_ERROR para jobText string vazia, sem tocar dados nem LLM", async () => {
+    // Distinto do caso \"só espaços\": string totalmente vazia. O refine do schema
+    // reprova (trim().length === 0) antes de qualquer acesso a base/vaga/LLM.
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: "" }));
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error.code).toBe("VALIDATION_ERROR");
+    expect(getProfileBundle).not.toHaveBeenCalled();
+    expect(createJobPosting).not.toHaveBeenCalled();
+    expect(generateResumeContent).not.toHaveBeenCalled();
   });
 });

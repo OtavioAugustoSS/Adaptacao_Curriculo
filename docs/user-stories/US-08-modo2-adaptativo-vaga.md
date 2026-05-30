@@ -43,5 +43,5 @@
 
 ## Pendências
 
-- [DECISÃO PENDENTE] `parsedKeywords` é preenchido nesta US (extração de palavras-chave) ou fica opcional/nulo no MVP?
-- [DECISÃO PENDENTE] `title`/`company` do `JobPosting` são extraídos pela IA, informados pelo usuário, ou deixados vazios?
+- [RESOLVIDO — ver ADR-0016] `parsedKeywords` **não é preenchido no MVP** (fica `null`); o casamento vaga×base acontece dentro do prompt do Modo 2, não por extração prévia.
+- [RESOLVIDO — ver ADR-0016] `title`/`company` do `JobPosting` são **opcionais e deixados vazios** no MVP — o usuário cola só o `rawText`; não há campos separados nem extração por IA.

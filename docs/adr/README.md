@@ -26,6 +26,7 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0013](0013-modelo-padrao-llama-3-3-70b.md) | Modelo padrão do MVP: `meta/llama-3.3-70b-instruct` | Accepted |
 | [0014](0014-geracao-modo1-prereq-traceability-nome-arquivo.md) | Geração Modo 1: pré-requisito da base, `traceabilityReport` pré-US-07, nome do `.tex` | Accepted |
 | [0015](0015-guardrail-rastreabilidade-classificacao-regeneracao.md) | Guardrail de rastreabilidade (US-07): classificação erro×aviso e regeneração | Accepted |
+| [0016](0016-modo2-historico-escopo-mvp.md) | Modo 2 (US-08) e histórico (US-09): decisões de escopo do MVP | Accepted |
 
 ## Template padrão de ADR
 

@@ -1,15 +1,19 @@
 // POST /api/resumes/generate — gera um currículo (contrato §2).
 //
-// Esta rota implementa o Modo 1 (mode=STANDARD). Fluxo (spec §3):
-//   1. Valida o request (GenerateRequestSchema) -> 400 se inválido.
-//   2. Resolve usuário + carrega a base; valida pré-requisito (ADR-0014)
-//      -> 422 PREREQUISITE_NOT_MET (sem chamar o LLM).
-//   3. select-content: base -> LLMProvider -> ResumeContent validado.
-//   4. GUARDRAIL (US-07, ADR-0015): validateTraceability(content, base).
-//      errors -> regenera 1x; persistindo -> 422 GUARDRAIL_FAILED (não persiste).
+// Esta rota implementa o Modo 1 (mode=STANDARD) e o Modo 2 (mode=JOB_ADAPTIVE,
+// US-08). Fluxo (spec §3):
+//   1. Valida o request (GenerateRequestSchema) -> 400 se inválido (no Modo 2 o
+//      refine já exige `jobText` não-vazio).
+//   2. Resolve usuário + carrega a base; valida pré-requisito (ADR-0014/0016: o
+//      mesmo nos dois modos) -> 422 PREREQUISITE_NOT_MET (sem chamar o LLM).
+//   2b. Modo 2: persiste o JobPosting a partir do `jobText` (ADR-0016).
+//   3. select-content: base (+ vaga no Modo 2) -> LLMProvider -> ResumeContent validado.
+//   4. GUARDRAIL (US-07, ADR-0015): validateTraceability(content, base) — reutilizado
+//      sem mudança nos dois modos. errors -> regenera 1x; persistindo -> 422
+//      GUARDRAIL_FAILED (não persiste).
 //   5. render-latex: ResumeContent (+ header do Profile) -> .tex.
-//   6. Persiste GeneratedResume (mode=STANDARD, traceabilityReport = relatório real).
-// Erros do LLM (LLMError) -> 502. Modo 2 (JOB_ADAPTIVE) fica para a US-08.
+//   6. Persiste GeneratedResume (mode + jobPostingId no Modo 2 + traceabilityReport real).
+// Erros do LLM (LLMError) -> 502.
 
 import { NextResponse, type NextRequest } from "next/server";
 import {
@@ -22,14 +26,18 @@ import {
 import { errorResponse, validationErrorResponse } from "@/lib/http";
 import { getProfileBundle } from "@/server/data/profile-repo";
 import { createGeneratedResume } from "@/server/data/resume-repo";
+import { createJobPosting } from "@/server/data/job-repo";
 import {
   meetsGenerationPrerequisite,
   PREREQUISITE_MESSAGE,
 } from "@/server/resume/prerequisite";
-import { generateStandardContent } from "@/server/resume/select-content";
+import {
+  generateStandardContent,
+  generateJobAdaptiveContent,
+} from "@/server/resume/select-content";
 import { validateTraceability } from "@/server/resume/validate-traceability";
 import { renderResume } from "@/server/resume/render-latex";
-import { getLLMProvider, type LLMProvider } from "@/server/llm";
+import { getLLMProvider } from "@/server/llm";
 import { LLMError } from "@/server/llm/provider";
 import { resolveModel } from "@/server/llm/models";
 
@@ -37,14 +45,18 @@ import { resolveModel } from "@/server/llm/models";
 const MAX_ATTEMPTS = 2;
 
 /**
- * Gera o conteúdo e roda o guardrail, regenerando em caso de erro forte até o
- * limite do ADR-0015. Devolve o conteúdo aprovado + seu relatório (só warnings),
- * ou o último relatório com erros (para o handler responder 422 sem persistir).
+ * Roda o guardrail sobre uma função geradora de conteúdo, regenerando em caso de
+ * erro forte até o limite do ADR-0015. Recebe o GERADOR (Modo 1 ou Modo 2) já
+ * fechado sobre seus insumos (base / base+vaga), de modo que a lógica do guardrail
+ * é única — não duplicada por modo. O guardrail confere o conteúdo contra a `bundle`
+ * (base): independe do modo (ADR-0016).
+ *
+ * Devolve o conteúdo aprovado + seu relatório (só warnings), ou o último relatório
+ * com erros (para o handler responder 422 sem persistir).
  */
 async function generateWithGuardrail(
   bundle: ProfileBundle,
-  provider: LLMProvider,
-  modelId: string,
+  generate: () => Promise<ResumeContent>,
 ): Promise<
   | { ok: true; content: ResumeContent; report: TraceabilityReport }
   | { ok: false; report: TraceabilityReport }
@@ -52,7 +64,7 @@ async function generateWithGuardrail(
   let lastReport: TraceabilityReport = { errors: [], warnings: [] };
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const content = await generateStandardContent(bundle, provider, modelId);
+    const content = await generate();
     const report = validateTraceability(content, bundle);
     if (report.errors.length === 0) {
       return { ok: true, content, report };
@@ -76,20 +88,11 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return validationErrorResponse(parsed.error);
   }
-
-  // Modo 2 (adaptativo à vaga) é da US-08; ainda não implementado. O request é
-  // bem-formado (passa no Zod), mas o modo não pode ser processado nesta fatia ->
-  // 422 (semântica de Unprocessable, alinhada ao uso de 422 no contrato §2).
-  if (parsed.data.mode === "JOB_ADAPTIVE") {
-    return errorResponse(
-      422,
-      "MODE_NOT_IMPLEMENTED",
-      "O modo adaptativo à vaga ainda não está disponível.",
-    );
-  }
+  const { mode } = parsed.data;
 
   try {
-    // 2. Base + pré-requisito (ADR-0014). Bem-formado mas base insuficiente -> 422.
+    // 2. Base + pré-requisito (ADR-0014/0016: o mesmo nos dois modos). Bem-formado
+    //    mas base insuficiente -> 422 (sem chamar o LLM, sem criar JobPosting).
     const bundle = await getProfileBundle();
     if (!meetsGenerationPrerequisite(bundle)) {
       return errorResponse(422, "PREREQUISITE_NOT_MET", PREREQUISITE_MESSAGE);
@@ -97,13 +100,29 @@ export async function POST(req: NextRequest) {
 
     // Resolve o modelo UMA vez: o mesmo id vai ao provider e é persistido (consistência).
     const modelId = resolveModel().id;
+    const provider = getLLMProvider();
+
+    // 2b. Modo 2 (ADR-0016): persiste a vaga (rawText) e monta o gerador adaptativo.
+    //     O refine do schema já garante jobText não-vazio aqui; o `??""` é só para o
+    //     tipo. O guardrail é o mesmo dos dois modos — só muda a função geradora.
+    let jobPostingId: string | null = null;
+    let generate: () => Promise<ResumeContent>;
+    if (mode === "JOB_ADAPTIVE") {
+      const jobText = parsed.data.jobText ?? "";
+      const jobPosting = await createJobPosting({ rawText: jobText });
+      jobPostingId = jobPosting.id ?? null;
+      generate = () =>
+        generateJobAdaptiveContent(bundle, jobText, provider, modelId);
+    } else {
+      generate = () => generateStandardContent(bundle, provider, modelId);
+    }
 
     // 3-4. Conteúdo via LLM + guardrail de rastreabilidade (regenera 1x em erro forte).
-    const provider = getLLMProvider();
-    const result = await generateWithGuardrail(bundle, provider, modelId);
+    const result = await generateWithGuardrail(bundle, generate);
 
     // Erro forte persistente após a regeneração -> 422, com o relatório em details.
-    // Geração que falha o guardrail NÃO é persistida (ADR-0015).
+    // Geração que falha o guardrail NÃO é persistida (ADR-0015). No Modo 2 o
+    // JobPosting já foi salvo — é o insumo da tentativa, não um currículo gerado.
     if (!result.ok) {
       return errorResponse(
         422,
@@ -117,8 +136,10 @@ export async function POST(req: NextRequest) {
     const texOutput = renderResume(result.content, bundle.profile);
 
     // 6. Persiste com o relatório real (warnings exibidos no preview; ADR-0015).
+    //    No Modo 2 grava o jobPostingId (ADR-0016).
     const saved = await createGeneratedResume({
-      mode: "STANDARD",
+      mode,
+      jobPostingId,
       modelId,
       content: result.content,
       texOutput,

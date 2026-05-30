@@ -40,5 +40,5 @@
 
 ## Pendências
 
-- [DECISÃO PENDENTE] A spec não menciona exclusão de itens do histórico. Confirmar se "deletar currículo" entra no MVP ou fica fora do escopo.
-- [DECISÃO PENDENTE] Exibir o nome/título da vaga (`JobPosting.title`/`company`) na linha do histórico exige join; confirmar se `GET /api/resumes` deve incluir dados da vaga associada no response.
+- [RESOLVIDO — ver ADR-0016] **Sem exclusão** de itens do histórico no MVP — a spec não prevê deletar currículo.
+- [RESOLVIDO — ver ADR-0016] `GET /api/resumes` devolve `GeneratedResumeSchema[]` **sem join** com `JobPosting`; o título/texto da vaga **não é exibido** no histórico no MVP (denormalizar exigiria mudar o contrato congelado — fica como melhoria futura).

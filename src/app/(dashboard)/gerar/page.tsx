@@ -1,12 +1,16 @@
 "use client";
 
-// Tela /gerar — gerador de currículo (US-05/US-06, spec §2.2).
-// Esta fatia cobre o Modo 1 (currículo padrão): botão "Gerar currículo padrão",
-// pré-requisito da base, loading durante a chamada ao LLM, e preview do `.tex`
-// com Copiar + Baixar. O Modo 2 (adaptativo à vaga) entra na US-08.
+// Tela /gerar — gerador de currículo (US-05/US-06/US-08, spec §2.2).
+// Cobre os dois modos:
+//   - Modo 1 (STANDARD): botão "Gerar currículo padrão" — currículo geral da base.
+//   - Modo 2 (JOB_ADAPTIVE, US-08): textarea para colar a vaga + botão "Adaptar à
+//     vaga" — a IA prioriza/reordena/reescreve só itens reais da base que casam com a
+//     vaga e OMITE o que falta (nunca inventa).
+// Os dois compartilham os mesmos estados (validando/gerando/preview/erro/avisos); só
+// muda o insumo enviado ao POST. Um seletor de modo deixa claro qual está ativo.
 //
-// Pré-requisito: checamos a base (GET /api/profile) só para ORIENTAR/habilitar o
-// botão no cliente; a fonte da verdade é o servidor (422 PREREQUISITE_NOT_MET).
+// Pré-requisito: checamos a base (GET /api/profile) só para ORIENTAR/habilitar os
+// botões no cliente; a fonte da verdade é o servidor (422 PREREQUISITE_NOT_MET).
 // Não duplicamos a regra de negócio aqui — apenas espelhamos o ADR-0014 para UX.
 
 import { useEffect, useState } from "react";
@@ -16,9 +20,14 @@ import type { ProfileBundle, GeneratedResume } from "@/lib/schemas";
 // preview, erro (com retry).
 type Status = "validating" | "idle" | "generating" | "preview" | "error";
 
+// Modo ativo na tela. STANDARD = Modo 1; JOB_ADAPTIVE = Modo 2 (adaptativo à vaga).
+type Mode = "STANDARD" | "JOB_ADAPTIVE";
+
 export default function GerarPage() {
   const [status, setStatus] = useState<Status>("validating");
   const [canGenerate, setCanGenerate] = useState(false);
+  const [mode, setMode] = useState<Mode>("STANDARD");
+  const [jobText, setJobText] = useState("");
   const [resume, setResume] = useState<GeneratedResume | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -49,6 +58,13 @@ export default function GerarPage() {
     };
   }, []);
 
+  // No Modo 2 também é preciso ter colado a vaga (espelha o refine do contrato).
+  const jobTextFilled = jobText.trim().length > 0;
+  const canSubmit =
+    canGenerate &&
+    status !== "generating" &&
+    (mode === "STANDARD" || jobTextFilled);
+
   async function handleGenerate() {
     setErrorMsg(null);
     setCopied(false);
@@ -57,7 +73,11 @@ export default function GerarPage() {
       const res = await fetch("/api/resumes/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "STANDARD" }),
+        body: JSON.stringify(
+          mode === "JOB_ADAPTIVE"
+            ? { mode: "JOB_ADAPTIVE", jobText }
+            : { mode: "STANDARD" },
+        ),
       });
 
       if (!res.ok) {
@@ -97,12 +117,50 @@ export default function GerarPage() {
     );
   }
 
+  const generating = status === "generating";
+
   return (
     <main style={styles.main}>
       <h1>Gerar currículo</h1>
       <p style={styles.subtitle}>
-        Modo padrão: a IA monta um currículo geral usando apenas itens reais da sua
-        base. A saída é um arquivo <code>.tex</code> para compilar no Overleaf.
+        A IA monta um currículo usando apenas itens reais da sua base — nunca inventa.
+        A saída é um arquivo <code>.tex</code> para compilar no Overleaf.
+      </p>
+
+      {/* Seletor de modo: deixa claro qual fluxo está ativo (Modo 1 x Modo 2). */}
+      <div style={styles.modeTabs} role="tablist" aria-label="Modo de geração">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "STANDARD"}
+          onClick={() => setMode("STANDARD")}
+          disabled={generating}
+          style={{
+            ...styles.modeTab,
+            ...(mode === "STANDARD" ? styles.modeTabActive : {}),
+          }}
+        >
+          Currículo padrão
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "JOB_ADAPTIVE"}
+          onClick={() => setMode("JOB_ADAPTIVE")}
+          disabled={generating}
+          style={{
+            ...styles.modeTab,
+            ...(mode === "JOB_ADAPTIVE" ? styles.modeTabActive : {}),
+          }}
+        >
+          Adaptar à vaga
+        </button>
+      </div>
+
+      <p style={styles.modeHint}>
+        {mode === "STANDARD"
+          ? "Modo padrão: um currículo geral cobrindo seu perfil completo."
+          : "Modo adaptativo: cole o texto da vaga e a IA prioriza, reordena e reescreve só os itens reais que casam com ela — omitindo o que a vaga pede e você não tem."}
       </p>
 
       {!canGenerate && (
@@ -112,20 +170,47 @@ export default function GerarPage() {
         </div>
       )}
 
+      {/* Modo 2: campo grande para colar a vaga. */}
+      {mode === "JOB_ADAPTIVE" && (
+        <div style={styles.jobField}>
+          <label htmlFor="jobText" style={styles.jobLabel}>
+            Texto da vaga
+          </label>
+          <textarea
+            id="jobText"
+            value={jobText}
+            onChange={(e) => setJobText(e.target.value)}
+            disabled={generating}
+            placeholder="Cole aqui a descrição completa da vaga (responsabilidades, requisitos, etc.)."
+            rows={12}
+            style={styles.jobTextarea}
+          />
+          {!jobTextFilled && (
+            <span style={styles.muted}>
+              Cole a descrição da vaga para habilitar a adaptação.
+            </span>
+          )}
+        </div>
+      )}
+
       <div style={styles.actions}>
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={!canGenerate || status === "generating"}
+          disabled={!canSubmit}
           style={{
             ...styles.primaryButton,
-            ...(!canGenerate || status === "generating" ? styles.buttonDisabled : {}),
+            ...(!canSubmit ? styles.buttonDisabled : {}),
           }}
         >
-          {status === "generating" ? "Gerando…" : "Gerar currículo padrão"}
+          {generating
+            ? "Gerando…"
+            : mode === "JOB_ADAPTIVE"
+              ? "Adaptar à vaga"
+              : "Gerar currículo padrão"}
         </button>
 
-        {status === "generating" && (
+        {generating && (
           <span role="status" style={styles.muted}>
             Chamando a IA — isso pode levar alguns segundos.
           </span>
@@ -145,7 +230,9 @@ export default function GerarPage() {
         <section aria-labelledby="preview-heading" style={styles.previewSection}>
           <div style={styles.previewHeader}>
             <h2 id="preview-heading" style={styles.h2}>
-              Currículo gerado (.tex)
+              {resume.mode === "JOB_ADAPTIVE"
+                ? "Currículo adaptado à vaga (.tex)"
+                : "Currículo gerado (.tex)"}
             </h2>
             <div style={styles.previewButtons}>
               <button type="button" onClick={handleCopy} style={styles.secondaryButton}>
@@ -191,6 +278,30 @@ const styles: Record<string, React.CSSProperties> = {
   main: { fontFamily: "system-ui, sans-serif", padding: "2rem", maxWidth: 820, margin: "0 auto" },
   subtitle: { color: "#555", marginTop: "-0.25rem" },
   h2: { fontSize: "1.15rem", margin: 0 },
+  modeTabs: { display: "flex", gap: "0.5rem", marginTop: "1.5rem" },
+  modeTab: {
+    padding: "0.5rem 1rem",
+    background: "#fff",
+    color: "#1a5cff",
+    border: "1px solid #1a5cff",
+    borderRadius: 8,
+    fontSize: "0.9rem",
+    cursor: "pointer",
+  },
+  modeTabActive: { background: "#1a5cff", color: "#fff" },
+  modeHint: { color: "#555", fontSize: "0.9rem", marginTop: "0.75rem" },
+  jobField: { display: "flex", flexDirection: "column", gap: "0.35rem", marginTop: "1rem" },
+  jobLabel: { fontWeight: 600, fontSize: "0.9rem" },
+  jobTextarea: {
+    width: "100%",
+    padding: "0.75rem",
+    border: "1px solid #ccc",
+    borderRadius: 8,
+    fontSize: "0.9rem",
+    fontFamily: "inherit",
+    resize: "vertical",
+    boxSizing: "border-box",
+  },
   actions: { display: "flex", alignItems: "center", gap: "1rem", marginTop: "1.5rem" },
   primaryButton: {
     padding: "0.6rem 1.25rem",
