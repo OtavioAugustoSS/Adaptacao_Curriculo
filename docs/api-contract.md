@@ -4,7 +4,11 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-29 — nota em §3: o renderer recebe o cabeçalho (`Profile`)
+> Última alteração: 2026-05-30 — §2: o status **422** passa a cobrir também
+> "pré-requisito de base não atendido" (`code: PREREQUISITE_NOT_MET`) na rota
+> `POST /api/resumes/generate`, além de falha de guardrail/regeneração (ADR-0014).
+> Ampliação de semântica de status; **nenhum schema muda** — contrato segue congelado.
+> 2026-05-29 — nota em §3: o renderer recebe o cabeçalho (`Profile`)
 > como parâmetro separado do `ResumeContent` (detalhe de implementação, coerente com ADR-0007;
 > contrato permanece congelado, sem mudança de schema).
 > 2026-05-29 — versão inicial (congelamento).
@@ -43,7 +47,8 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 **Convenções:**
 - Todo handler resolve o usuário via `getCurrentUserId()` — sem `userId` no request.
 - Erros retornam envelope `{ error: { code, message, details? } }` com status HTTP adequado
-  (400 validação Zod, 404 não encontrado, 422 falha de guardrail/regeneração, 502 erro do LLM).
+  (400 validação Zod, 404 não encontrado, 422 falha de guardrail/regeneração **ou pré-requisito
+  de base não atendido** — `PREREQUISITE_NOT_MET` (ADR-0014), 502 erro do LLM).
 - Sem paginação no MVP (volume baixo, single-user).
 
 ## 3. `ResumeContentSchema` — saída estruturada do LLM (núcleo do guardrail)

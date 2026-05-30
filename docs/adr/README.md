@@ -22,6 +22,10 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0009](0009-escape-latex-centralizado.md) | Escape LaTeX centralizado (`escapeLatex`) | Accepted |
 | [0010](0010-dois-modos-mvp.md) | Dois modos no MVP (Standard, Job-adaptive); 3º modo é não-objetivo | Accepted |
 | [0011](0011-contrato-api-zod-congelado.md) | Contrato de API como schemas Zod compartilhados, congelado | Accepted |
+| [0012](0012-saida-estruturada-json-schema-llmprovider.md) | Saída estruturada via `response_format: json_schema` + Zod; timeout/retry no adapter | Accepted |
+| [0013](0013-modelo-padrao-llama-3-3-70b.md) | Modelo padrão do MVP: `meta/llama-3.3-70b-instruct` | Accepted |
+| [0014](0014-geracao-modo1-prereq-traceability-nome-arquivo.md) | Geração Modo 1: pré-requisito da base, `traceabilityReport` pré-US-07, nome do `.tex` | Accepted |
+| [0015](0015-guardrail-rastreabilidade-classificacao-regeneracao.md) | Guardrail de rastreabilidade (US-07): classificação erro×aviso e regeneração | Accepted |
 
 ## Template padrão de ADR
 
