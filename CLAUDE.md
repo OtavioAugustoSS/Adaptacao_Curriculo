@@ -21,20 +21,41 @@ decision. This file is the quick operational summary; `ARCHITECTURE.md` and `doc
 
 ## Where we are / how to resume
 
-**Read `docs/release/fatia-3.md` first** — the committed source of truth for current progress
-(the `docs/release/fatia-N.md` series chains the history: fatia-1 → fatia-2 → fatia-3). As of
-2026-05-30 the **MVP is functionally complete**: all 9 user stories (US-01…US-09) done and
-verified, committed on `main` (latest `a38d617` — Fatia 3). `tsc` clean · `npm test` **147/147** ·
-`next build` OK. **Both Mode 1 and Mode 2 are validated end-to-end against real NVIDIA NIM** —
-Mode 2 smoke test passed 2026-05-30 (see `docs/release/fatia-3.md` → "Smoke test real do Modo 2"):
-guardrail clean (`errors: []`, `warnings: []`), no invented company/skill. **The MVP is therefore
-functionally closed.** **Fatia 4 — visual polish** (split `fullstack-agent` into `frontend-agent` +
-`backend-agent`, use the design skills; UI today is functional inline-styles) **is deferred to the
-LAST step, on the owner's explicit request** — do NOT spawn the extended team or run design skills
-proactively until asked. On a freshly cloned machine, follow the setup in `docs/release/fatia-1.md`
-(supply your own NIM `LLM_API_KEY` — it **must start with `nvapi-`**, else 401). Windows gotcha:
-if `next build` fails with a missing-manifest ENOENT, delete `.next` and rebuild (stale cache, not
-a code bug). The project owner makes the git commits — propose them, don't commit yourself.
+**Read `docs/release/fatia-7.md` first** — the committed source of truth for current progress
+(the `docs/release/fatia-N.md` series chains the history: fatia-1 → … → fatia-7). As of
+**2026-05-31, MVP + Fatias 4–7 are done and committed on `main`** (latest `1cdc99e`):
+- **MVP (US-01…09)** — base CRUD, Modo 1/2, guardrail anti-alucinação; validado e2e vs NVIDIA NIM real.
+- **Fatia 4 (US-10, ADR-0017)** — redesign visual dev-tool em Tailwind.
+- **Fatia 5 (US-11/12, ADR-0018)** — importar perfil por **dump de texto** (IA estrutura → mescla no
+  `/perfil`, **não persiste**) + Formação "em andamento" (`Education.current`).
+- **Fatia 6 (US-13, ADR-0019)** — importar perfil por **arquivo** (PDF/DOCX/TXT) via `unpdf`+`mammoth`
+  no servidor → mesmo pipeline de extração.
+- **Fatia 7 (US-14/15/16, ADR-0020/0021)** — geração **completa e fiel** (idiomas, cursos, bullets+stack
+  de projeto; títulos PT-BR; links azul-marinho, não rosa), gestão de currículos (nome/ver/copiar/editar/
+  excluir + "Abrir no Overleaf"), **limpar base** + import "Substituir".
+
+`tsc` clean · `npm test` **305/305** · `next build` OK (13 rotas). **`main` está 4 commits à frente de
+`origin/main` e NÃO foi feito push** — o dono dá o push (nesta sessão o Claude commitou+mergeou em `main`
+**a pedido do dono**; o padrão normal é **propor commits, não commitar sozinho**). Últimos commits:
+`4eb0f79` (F5), `73b9018` (F6), `de42249` (fix import 502), `1cdc99e` (F7).
+
+**Gotchas / aprendizados (importantes):**
+- O **gate do projeto são OS DOIS: `npx tsc --noEmit` E `npm test`** — o vitest transpila sem type-check,
+  então passa mesmo com erro de tipo. Sempre rode os dois.
+- O **import** (arquivo/texto) precisa de **timeout longo**: a chamada à NIM leva ~50s para um currículo
+  completo. O import usa **180s + `json_object`** (não `json_schema`) em `nim.ts` — 60s causava 502.
+- O schema de rascunho do import (`ImportProfileBundleSchema`) é **tolerante** (campo ausente → "") para um
+  currículo incompleto não dar 502; a obrigatoriedade fica no `PUT /api/profile` (estrito).
+- **SQLite guarda DateTime como epoch em MILISSEGUNDOS** → migrações com backfill de data precisam
+  `"createdAt"/1000` + `strftime(..., 'unixepoch')`.
+- **`prisma generate` dá EPERM no Windows** enquanto o `next dev` segura o engine DLL (inofensivo; .d.ts/.js
+  regeneram). O `npx prisma` é quebrado pelo proxy `rtk` → usar `node node_modules/prisma/build/index.js`.
+- `next build` ENOENT no Windows (`.next` velho) → apagar `.next` e rebuildar. NIM key tem de começar com
+  `nvapi-` (senão 401). Em máquina nova, seguir `docs/release/fatia-1.md`.
+
+**Workflow:** cada fatia via Agent Team de **5 papéis** (`TeamCreate`: lead + product-owner + architect +
+fullstack + qa), recriado a cada sessão (morre no `/clear` e no resume). Architect escreve o ADR (gate)
+ANTES do código; mudanças no contrato congelado são **aditivas** + nota datada em `docs/api-contract.md`.
 
 ## Stack (see ARCHITECTURE.md §2)
 
