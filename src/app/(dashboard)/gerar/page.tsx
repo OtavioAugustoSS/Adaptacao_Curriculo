@@ -37,6 +37,9 @@ export default function GerarPage() {
   const [mode, setMode] = useState<Mode>("STANDARD");
   const [jobText, setJobText] = useState("");
   const [name, setName] = useState("");
+  // Currículos do usuário (para o seletor de base no Modo 2 — ADR-0022) + o id escolhido.
+  const [resumes, setResumes] = useState<GeneratedResume[]>([]);
+  const [baseResumeId, setBaseResumeId] = useState<string>("");
   const [resume, setResume] = useState<GeneratedResume | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -47,14 +50,31 @@ export default function GerarPage() {
     let active = true;
     (async () => {
       try {
-        const res = await fetch("/api/profile");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const bundle = (await res.json()) as ProfileBundle;
+        // Base (pré-requisito) + currículos (seletor de base do Modo 2) em paralelo.
+        const [profileRes, resumesRes] = await Promise.all([
+          fetch("/api/profile"),
+          fetch("/api/resumes"),
+        ]);
+        if (!profileRes.ok) throw new Error(`HTTP ${profileRes.status}`);
+        const bundle = (await profileRes.json()) as ProfileBundle;
         if (!active) return;
         const ok =
           bundle.profile.fullName.trim().length > 0 &&
           (bundle.experiences.length > 0 || bundle.educations.length > 0);
         setCanGenerate(ok);
+
+        // Currículos para basear a adaptação: pré-seleciona o padrão (ou o STANDARD mais
+        // recente). Falha ao listar não impede gerar — só esvazia o seletor (fallback no
+        // servidor deriva da base).
+        if (resumesRes.ok) {
+          const list = (await resumesRes.json()) as GeneratedResume[];
+          if (!active) return;
+          setResumes(list);
+          const standards = list.filter((r) => r.mode === "STANDARD");
+          const def = standards.find((r) => r.isDefault) ?? standards[0];
+          if (def) setBaseResumeId(def.id);
+        }
+
         setStatus("idle");
       } catch {
         if (!active) return;
@@ -66,6 +86,10 @@ export default function GerarPage() {
       active = false;
     };
   }, []);
+
+  // Currículos STANDARD são os candidatos a base (os "completos"). O selecionado é o "em uso".
+  const standardResumes = resumes.filter((r) => r.mode === "STANDARD");
+  const selectedBase = standardResumes.find((r) => r.id === baseResumeId) ?? null;
 
   // No Modo 2 também é preciso ter colado a vaga (espelha o refine do contrato).
   const jobTextFilled = jobText.trim().length > 0;
@@ -79,9 +103,11 @@ export default function GerarPage() {
     try {
       // Nome opcional: só vai no corpo se preenchido (ADR-0021 — senão default no servidor).
       const trimmedName = name.trim();
-      const payload: { mode: Mode; jobText?: string; name?: string } =
+      const payload: { mode: Mode; jobText?: string; name?: string; baseResumeId?: string } =
         mode === "JOB_ADAPTIVE" ? { mode: "JOB_ADAPTIVE", jobText } : { mode: "STANDARD" };
       if (trimmedName) payload.name = trimmedName;
+      // Modo 2: base da adaptação (ADR-0022). Vazio → servidor usa o padrão/fallback.
+      if (mode === "JOB_ADAPTIVE" && baseResumeId) payload.baseResumeId = baseResumeId;
 
       const res = await fetch("/api/resumes/generate", {
         method: "POST",
@@ -182,6 +208,57 @@ export default function GerarPage() {
               ? "Gera um currículo completo a partir de toda a sua base, sem foco em uma vaga específica."
               : "Reordena e prioriza os itens da sua base de acordo com a vaga — sem inventar nada."}
           </p>
+
+          {/* Modo 2: seletor do currículo base (referência de profundidade — ADR-0022). */}
+          {mode === "JOB_ADAPTIVE" && (
+            <div className="gen-block">
+              {standardResumes.length > 0 ? (
+                <div className="field">
+                  <label className="label" htmlFor="baseResume">
+                    Basear no currículo padrão
+                  </label>
+                  <select
+                    id="baseResume"
+                    className="input"
+                    value={baseResumeId}
+                    onChange={(e) => setBaseResumeId(e.target.value)}
+                    disabled={generating}
+                  >
+                    {standardResumes.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {(r.isDefault ? "★ " : "") + r.name + (r.isDefault ? " (padrão)" : "")}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="help">
+                    A IA usa este currículo como <strong>referência de profundidade</strong> e o adapta à
+                    vaga — mantém a riqueza (projetos, bullets e stack), sem inventar nada.
+                  </span>
+                  {selectedBase && (
+                    <div className="base-inuse">
+                      <Icon name="check" /> Em uso: <strong>{selectedBase.name}</strong>
+                      {selectedBase.isDefault && (
+                        <span className="badge badge-default">
+                          <span className="star" aria-hidden="true">★</span> Padrão
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="note note-accent">
+                  <Icon name="spark" />
+                  <div className="note-body">
+                    <p className="note-title">Sem currículo base ainda</p>
+                    <p>
+                      Gere primeiro um <strong>Currículo padrão</strong> (modo ao lado) para servir de base.
+                      Sem ele, a adaptação ainda funciona — a IA deriva direto da sua base.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Modo 2: campo grande para colar a vaga. */}
           {mode === "JOB_ADAPTIVE" && (

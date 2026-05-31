@@ -88,6 +88,22 @@ export default function CurriculosPage() {
     }
   }
 
+  // ADR-0022 — define o currículo como padrão (PATCH { isDefault: true }); recarrega a
+  // lista (o padrão anterior é desmarcado no servidor — no máx. um padrão por usuário).
+  async function handleSetDefault(resume: GeneratedResume) {
+    try {
+      const res = await fetch(`/api/resumes/${resume.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isDefault: true }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await load();
+    } catch {
+      // Erro silencioso no MVP; a lista permanece como está.
+    }
+  }
+
   // WS4 — exclui o item (DELETE /api/resumes/[id]) após confirmação; recarrega a lista.
   async function handleDelete(resume: GeneratedResume) {
     const ok = window.confirm(
@@ -160,8 +176,9 @@ export default function CurriculosPage() {
             const isReportOpen = openReportId === resume.id;
             const isTexOpen = openTexId === resume.id;
             const isRenaming = renamingId === resume.id;
+            const isDefault = resume.isDefault;
             return (
-              <article className="cv-item" key={resume.id}>
+              <article className={"cv-item" + (isDefault ? " is-default" : "")} key={resume.id}>
                 <div className="cv-top">
                   <div className={"cv-emblem " + (adaptado ? "adaptado" : "padrao")}>
                     <Icon name="file" />
@@ -189,6 +206,11 @@ export default function CurriculosPage() {
                         <span className="dot" />
                         {resumeModeBadge(resume.mode)}
                       </span>
+                      {isDefault && (
+                        <span className="badge badge-default" title="Currículo padrão — base das adaptações à vaga">
+                          <span className="star" aria-hidden="true">★</span> Padrão
+                        </span>
+                      )}
                     </div>
                     <div className="cv-date">
                       <Icon name="clock" /> {formatResumeDate(resume.createdAt)}
@@ -242,6 +264,16 @@ export default function CurriculosPage() {
                     >
                       <Icon name="ext" /> {OVERLEAF_BUTTON_LABEL}
                     </a>
+                    {!isDefault && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => void handleSetDefault(resume)}
+                        title="Usar este como base das adaptações à vaga"
+                      >
+                        <span className="star" aria-hidden="true">★</span> Definir como padrão
+                      </button>
+                    )}
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => startRename(resume)}>
                       <Icon name="copy" /> Renomear
                     </button>

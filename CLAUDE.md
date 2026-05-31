@@ -21,9 +21,10 @@ decision. This file is the quick operational summary; `ARCHITECTURE.md` and `doc
 
 ## Where we are / how to resume
 
-**Read `docs/release/fatia-7.md` first** — the committed source of truth for current progress
-(the `docs/release/fatia-N.md` series chains the history: fatia-1 → … → fatia-7). As of
-**2026-05-31, MVP + Fatias 4–7 are done and committed on `main`** (latest `1cdc99e`):
+**Read `docs/release/fatia-8.md` first** — the committed source of truth for current progress
+(the `docs/release/fatia-N.md` series chains the history: fatia-1 → … → fatia-8). As of
+**2026-05-31, MVP + Fatias 4–8 are done** (4–7 committed on `main`, latest `1cdc99e`; **Fatia 8
+implementada mas NÃO commitada** — está só no working tree):
 - **MVP (US-01…09)** — base CRUD, Modo 1/2, guardrail anti-alucinação; validado e2e vs NVIDIA NIM real.
 - **Fatia 4 (US-10, ADR-0017)** — redesign visual dev-tool em Tailwind.
 - **Fatia 5 (US-11/12, ADR-0018)** — importar perfil por **dump de texto** (IA estrutura → mescla no
@@ -33,10 +34,15 @@ decision. This file is the quick operational summary; `ARCHITECTURE.md` and `doc
 - **Fatia 7 (US-14/15/16, ADR-0020/0021)** — geração **completa e fiel** (idiomas, cursos, bullets+stack
   de projeto; títulos PT-BR; links azul-marinho, não rosa), gestão de currículos (nome/ver/copiar/editar/
   excluir + "Abrir no Overleaf"), **limpar base** + import "Substituir".
+- **Fatia 8 (US-17/18, ADR-0022)** — **currículo padrão** (`isDefault`: marcar/destacar ★, auto-default no
+  1º; `PATCH` aceita `isDefault`); **seletor de base no `/gerar`** (Modo 2 escolhe o STANDARD; `baseResumeId`);
+  **adaptação mais rica** — o Modo 2 deixa o viés de "enxugar" e vira **Equilibrado** + recebe o currículo
+  padrão como **referência de profundidade** (não é fonte de fatos; guardrail/`ResumeContent`/renderer
+  **inalterados**). Implementada **direto pelo lead** a pedido do dono (sem o time de 5 papéis), ADR-first.
 
-`tsc` clean · `npm test` **305/305** · `next build` OK (13 rotas). **`main` está 4 commits à frente de
-`origin/main` e NÃO foi feito push** — o dono dá o push (nesta sessão o Claude commitou+mergeou em `main`
-**a pedido do dono**; o padrão normal é **propor commits, não commitar sozinho**). Últimos commits:
+`tsc` clean · `npm test` **330/330** · `next build` OK (13 rotas). **`main` está 4 commits à frente de
+`origin/main` e NÃO foi feito push**; **a Fatia 8 ainda está no working tree, NÃO commitada** (o lead
+**propõe** o commit; não commita sozinho, salvo pedido explícito do dono). Últimos commits em `main`:
 `4eb0f79` (F5), `73b9018` (F6), `de42249` (fix import 502), `1cdc99e` (F7).
 
 **Gotchas / aprendizados (importantes):**

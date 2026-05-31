@@ -146,4 +146,23 @@ describe("generateJobAdaptiveContent (Modo 2)", () => {
       generateJobAdaptiveContent(BUNDLE, JOB_TEXT, provider),
     ).rejects.toThrow("falha do provider");
   });
+
+  it("deve injetar o currículo base como referência de profundidade quando fornecido (ADR-0022)", async () => {
+    const { provider, generateResumeContent } = makeProvider();
+    // CONTENT serve de baseContent (é um ResumeContent válido); o id real garante marcador.
+    await generateJobAdaptiveContent(BUNDLE, JOB_TEXT, provider, undefined, CONTENT);
+
+    const params = generateResumeContent.mock.calls[0][0];
+    expect(params.user).toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+    // O system NÃO muda com baseContent (a referência vai só no user prompt).
+    expect(params.system).toBe(JOB_ADAPTIVE_CV_SYSTEM_PROMPT);
+  });
+
+  it("NÃO deve incluir referência quando baseContent é ausente (retrocompat)", async () => {
+    const { provider, generateResumeContent } = makeProvider();
+    await generateJobAdaptiveContent(BUNDLE, JOB_TEXT, provider);
+
+    const params = generateResumeContent.mock.calls[0][0];
+    expect(params.user).not.toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+  });
 });

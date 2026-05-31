@@ -4,7 +4,19 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-30 — **Fatia 7 (ADR-0020/ADR-0021)** — mudanças **aditivas**.
+> Última alteração: 2026-05-31 — **Fatia 8 (ADR-0022)** — mudanças **aditivas**.
+> **ADR-0022:** `GeneratedResume` ganha **`isDefault: boolean`** (`z.boolean().default(false)`; resposta de
+> `GET /api/resumes` e `PATCH`) — currículo padrão do usuário (no máx. 1, garantido na escrita). **`PATCH
+> /api/resumes/[id]`** passa a aceitar **`{ name?, isDefault?: true }`** (aditivo ao rename do ADR-0021; com
+> `isDefault: true` marca como padrão, 404 se alheio/inexistente). **`GenerateRequestSchema`** ganha
+> **`baseResumeId?: string`** (Modo 2): a rota carrega o conteúdo desse currículo — ou do padrão
+> (`getDefaultResume`) na ausência — e o injeta no prompt do Modo 2 como **referência de profundidade**
+> (bloco "CURRÍCULO PADRÃO DE REFERÊNCIA" no user prompt; **não** é fonte de fatos — o guardrail segue
+> validando contra a base). O prompt do Modo 2 troca o viés de "enxugar" pela política **Equilibrado**
+> (mantém experiências/maioria dos projetos, preserva profundidade dos bullets, 1–2 páginas). `ResumeContentSchema`,
+> renderer e guardrail **inalterados**; invariante anti-alucinação intacto.
+>
+> 2026-05-30 — **Fatia 7 (ADR-0020/ADR-0021)** — mudanças **aditivas**.
 > **ADR-0020:** o `ResumeContentSchema` ganha `languages` (`{ name, proficiency, sourceId? }[]`) e
 > `courses` (`{ title, issuer, date, url?, sourceId? }[]`); o item de projeto ganha `bullets: string[]`
 > e `techStack: string[]`. Modo 1 passa a ser **completo** (inclui tudo da base, não omite); Modo 2

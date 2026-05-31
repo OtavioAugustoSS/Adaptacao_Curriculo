@@ -47,6 +47,7 @@ interface GeneratedResumeRow {
   userId: string;
   name: string;
   mode: string;
+  isDefault: boolean;
   jobPostingId: string | null;
   modelId: string;
   contentJson: string;
@@ -65,6 +66,7 @@ function toGeneratedResume(row: GeneratedResumeRow): GeneratedResume {
     userId: row.userId,
     name: row.name,
     mode: row.mode,
+    isDefault: row.isDefault,
     jobPostingId: row.jobPostingId,
     modelId: row.modelId,
     contentJson: JSON.parse(row.contentJson),
@@ -96,11 +98,17 @@ export async function createGeneratedResume(
       ? input.name.trim()
       : defaultResumeName(input.mode, new Date());
 
+  // Auto-default (ADR-0022): se o usuário ainda não tem nenhum currículo, este vira o
+  // padrão — garante "pelo menos um padrão" sem fricção. Caso contrário, preserva o atual.
+  const existingCount = await prisma.generatedResume.count({ where: { userId } });
+  const isDefault = existingCount === 0;
+
   const row = await prisma.generatedResume.create({
     data: {
       userId,
       name,
       mode: input.mode,
+      isDefault,
       jobPostingId: input.jobPostingId ?? null,
       modelId: input.modelId,
       contentJson: JSON.stringify(input.content),
@@ -132,6 +140,34 @@ export async function renameGeneratedResume(
     data: { name },
   });
   if (result.count === 0) return null;
+
+  return getGeneratedResumeById(id);
+}
+
+/**
+ * Define um currículo como o PADRÃO do usuário atual (ADR-0022 — PATCH com isDefault).
+ * No máximo um padrão por usuário (garantido aqui, não por constraint de banco).
+ *
+ * Ordem proposital: marca o ALVO primeiro (`updateMany where { id, userId }`). Se nada
+ * foi afetado (id inexistente/alheio) devolve `null` SEM ter mexido no padrão atual — não
+ * deixamos o usuário sem padrão por um id inválido. Só então zera o `isDefault` dos demais.
+ */
+export async function setDefaultResume(
+  id: string,
+): Promise<GeneratedResume | null> {
+  const userId = getCurrentUserId();
+
+  const set = await prisma.generatedResume.updateMany({
+    where: { id, userId },
+    data: { isDefault: true },
+  });
+  if (set.count === 0) return null; // inexistente/alheio: nada muda (padrão atual intacto)
+
+  // Desmarca todos os OUTROS padrões do usuário (mantém só o alvo).
+  await prisma.generatedResume.updateMany({
+    where: { userId, isDefault: true, NOT: { id } },
+    data: { isDefault: false },
+  });
 
   return getGeneratedResumeById(id);
 }
@@ -185,4 +221,26 @@ export async function getGeneratedResumeById(
 
   if (!row) return null;
   return toGeneratedResume(row);
+}
+
+/**
+ * Devolve o currículo PADRÃO do usuário atual (ADR-0022) — usado como referência de
+ * profundidade no Modo 2 quando o request não traz `baseResumeId`. Se nenhum estiver
+ * marcado `isDefault` (caso de borda — ex.: o padrão foi excluído), faz fallback para o
+ * **STANDARD mais recente** (o currículo "completo" mais natural como base). `null` se o
+ * usuário não tiver nenhum currículo.
+ */
+export async function getDefaultResume(): Promise<GeneratedResume | null> {
+  const userId = getCurrentUserId();
+
+  const explicit = await prisma.generatedResume.findFirst({
+    where: { userId, isDefault: true },
+  });
+  if (explicit) return toGeneratedResume(explicit);
+
+  const latestStandard = await prisma.generatedResume.findFirst({
+    where: { userId, mode: "STANDARD" },
+    orderBy: { createdAt: "desc" },
+  });
+  return latestStandard ? toGeneratedResume(latestStandard) : null;
 }

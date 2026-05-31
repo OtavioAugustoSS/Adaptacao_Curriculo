@@ -76,6 +76,20 @@ describe("GenerateRequestSchema — name opcional (ADR-0021)", () => {
     const ok = GenerateRequestSchema.safeParse({ mode: "JOB_ADAPTIVE", name: "x" });
     expect(ok.success).toBe(false); // jobText ainda é obrigatório no Modo 2
   });
+
+  it("deve aceitar baseResumeId opcional no Modo 2 (ADR-0022)", () => {
+    const parsed = GenerateRequestSchema.parse({
+      mode: "JOB_ADAPTIVE",
+      jobText: "Vaga X",
+      baseResumeId: "gr-base",
+    });
+    expect(parsed.baseResumeId).toBe("gr-base");
+  });
+
+  it("deve aceitar request sem baseResumeId (ausente → servidor usa o padrão)", () => {
+    const parsed = GenerateRequestSchema.parse({ mode: "STANDARD" });
+    expect(parsed.baseResumeId).toBeUndefined();
+  });
 });
 
 describe("GeneratedResumeSchema — name obrigatório (ADR-0021)", () => {
@@ -100,5 +114,15 @@ describe("GeneratedResumeSchema — name obrigatório (ADR-0021)", () => {
     // O contentJson aninhado também ganha os defaults aditivos.
     expect(parsed.contentJson.languages).toEqual([]);
     expect(parsed.contentJson.courses).toEqual([]);
+  });
+
+  it("deve aplicar default isDefault=false quando ausente (ADR-0022, aditivo)", () => {
+    const parsed = GeneratedResumeSchema.parse(BASE);
+    expect(parsed.isDefault).toBe(false);
+  });
+
+  it("deve aceitar isDefault=true", () => {
+    const parsed = GeneratedResumeSchema.parse({ ...BASE, isDefault: true });
+    expect(parsed.isDefault).toBe(true);
   });
 });

@@ -4,7 +4,7 @@ import {
   buildJobAdaptiveCvUserPrompt,
   buildJobAdaptiveCvPrompts,
 } from "@/server/llm/prompts/job-adaptive-cv";
-import type { ProfileBundle } from "@/lib/schemas";
+import type { ProfileBundle, ResumeContent } from "@/lib/schemas";
 
 // Testes do PROMPT do Modo 2 (US-08). O prompt é a 2ª camada do invariante
 // anti-alucinação (ARCHITECTURE §6) e o ponto mais sensível do Modo 2: a vaga
@@ -106,5 +106,76 @@ describe("buildJobAdaptiveCvPrompts", () => {
     expect(system).toBe(JOB_ADAPTIVE_CV_SYSTEM_PROMPT);
     expect(user).toContain(JOB_TEXT);
     expect(user).toContain("exp-1");
+  });
+});
+
+// --- ADR-0022: política "Equilibrado" + referência de profundidade ---
+
+const BASE_CONTENT: ResumeContent = {
+  objective: "Resumo profundo",
+  education: [],
+  skills: [],
+  experience: [
+    {
+      sourceId: "exp-1",
+      role: "Dev",
+      company: "Acme",
+      period: "2020 — Atual",
+      bullets: ["contexto, fez X com Y, impacto Z, porque Y resolve W"],
+    },
+  ],
+  projects: [
+    {
+      title: "Projeto Bússola",
+      description: "plataforma",
+      bullets: ["b1", "b2"],
+      techStack: ["React", "Node"],
+    },
+  ],
+  languages: [],
+  courses: [],
+};
+
+describe("Modo 2 — filosofia Equilibrado (ADR-0022: não enxugar demais)", () => {
+  it("deve trocar o viés de enxugar pela orientação de manter riqueza", () => {
+    // A frase antiga que enviesava a IA a cortar NÃO pode mais existir.
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT).not.toContain(
+      "Um currículo mais curto e 100% verdadeiro é melhor que um inflado",
+    );
+    // E o prompt passa a exigir manter a maioria dos itens e a profundidade.
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT).toContain("MAIORIA dos projetos");
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT).toContain("PROFUNDIDADE");
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT.toLowerCase()).toContain("ats");
+  });
+
+  it("deve preservar os tokens do invariante anti-alucinação", () => {
+    // A virada de filosofia NÃO pode afrouxar o invariante.
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT).toContain("NÃO INVENTE NADA");
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT).toContain("OMITA");
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT.toLowerCase()).toContain("nunca preencha");
+    expect(JOB_ADAPTIVE_CV_SYSTEM_PROMPT.toLowerCase()).toContain(
+      "nem mesmo se a vaga pedir",
+    );
+  });
+});
+
+describe("Modo 2 — referência de profundidade (baseContent)", () => {
+  it("deve incluir o bloco de referência e o conteúdo base quando baseContent é fornecido", () => {
+    const user = buildJobAdaptiveCvUserPrompt(BUNDLE, JOB_TEXT, BASE_CONTENT);
+    expect(user).toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+    expect(user).toContain("Projeto Bússola"); // conteúdo do baseContent serializado
+    // Continua deixando claro que NÃO é fonte de fatos novos.
+    expect(user.toLowerCase()).toContain("não é fonte de fatos");
+  });
+
+  it("NÃO deve incluir o bloco de referência quando baseContent é ausente (retrocompat)", () => {
+    const user = buildJobAdaptiveCvUserPrompt(BUNDLE, JOB_TEXT);
+    expect(user).not.toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+  });
+
+  it("deve propagar o baseContent via buildJobAdaptiveCvPrompts", () => {
+    const { user } = buildJobAdaptiveCvPrompts(BUNDLE, JOB_TEXT, BASE_CONTENT);
+    expect(user).toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+    expect(user).toContain("Projeto Bússola");
   });
 });

@@ -20,6 +20,10 @@ export const GenerateRequestSchema = z
     // Nome opcional do currículo (ADR-0021). Ausente → o servidor aplica o default
     // (rótulo do modo + data). String vazia também cai no default no servidor.
     name: z.string().optional(),
+    // Currículo base para a adaptação (Modo 2, ADR-0022): id de um GeneratedResume do
+    // usuário cujo conteúdo é injetado como REFERÊNCIA DE PROFUNDIDADE no prompt. Ausente
+    // → o servidor usa o currículo padrão (getDefaultResume); sem padrão → deriva só da base.
+    baseResumeId: z.string().optional(),
   })
   .refine(
     (data) =>
@@ -61,6 +65,8 @@ export const GeneratedResumeSchema = z.object({
   /** Nome editável do usuário (ADR-0021); default no servidor (rótulo do modo + data). */
   name: z.string(),
   mode: GenerationModeSchema,
+  /** Currículo padrão do usuário (ADR-0022): no máx. 1 por usuário, garantido na escrita. */
+  isDefault: z.boolean().default(false),
   jobPostingId: z.string().nullable().optional(),
   modelId: z.string(),
   contentJson: ResumeContentSchema,

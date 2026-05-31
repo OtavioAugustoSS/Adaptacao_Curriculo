@@ -175,6 +175,9 @@
   .badge-success { background: var(--success-subtle); color: var(--success); border-color: var(--success-border); }
   .badge-warning { background: var(--warning-subtle); color: var(--warning); border-color: var(--warning-border); }
   .badge-danger { background: var(--danger-subtle); color: var(--danger); border-color: var(--danger-border); }
+  /* Currículo padrão (ADR-0022): chip de acento com ★ — destaca o "em uso/padrão". */
+  .badge-default { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); font-weight: 600; }
+  .badge-default .star { font-size: 12px; line-height: 1; }
 
   /* ---- tabs ---- */
   .tabs { display: inline-flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 4px; }
@@ -421,6 +424,13 @@
   .cv-list { display: flex; flex-direction: column; gap: 14px; }
   .cv-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--sh-sm); overflow: hidden; transition: .14s; }
   .cv-item:hover { border-color: var(--border-strong); box-shadow: var(--sh-md); }
+  /* Currículo padrão (ADR-0022): anel de acento + emblema realçado. */
+  .cv-item.is-default { border-color: var(--accent-border); box-shadow: 0 0 0 1px var(--accent-border), var(--sh-sm); }
+  .cv-item.is-default .cv-emblem.padrao { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); }
+  /* "Em uso" no /gerar — qual currículo base alimenta a adaptação. */
+  .base-inuse { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg-muted); flex-wrap: wrap; }
+  .base-inuse svg { width: 14px; height: 14px; color: var(--success); }
+  .base-inuse strong { color: var(--fg); font-weight: 600; }
   .cv-item .cv-top { display: flex; align-items: flex-start; gap: 15px; padding: 17px 18px; }
   .cv-emblem { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex: none; position: relative; }
   .cv-emblem svg { width: 21px; height: 21px; }

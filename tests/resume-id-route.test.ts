@@ -9,9 +9,11 @@ import type { GeneratedResume } from "@/lib/schemas";
 
 const renameGeneratedResume = vi.hoisted(() => vi.fn());
 const deleteGeneratedResume = vi.hoisted(() => vi.fn());
+const setDefaultResume = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/resume-repo", () => ({
   renameGeneratedResume,
   deleteGeneratedResume,
+  setDefaultResume,
 }));
 
 import { PATCH, DELETE } from "@/app/api/resumes/[id]/route";
@@ -37,6 +39,7 @@ const RENAMED: GeneratedResume = {
   userId: "user-local",
   name: "Novo nome",
   mode: "STANDARD",
+  isDefault: false,
   jobPostingId: null,
   modelId: "meta/llama-3.3-70b-instruct",
   contentJson: {
@@ -105,6 +108,65 @@ describe("PATCH /api/resumes/[id] — renomear", () => {
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.error.code).toBe("NOT_FOUND");
+  });
+});
+
+describe("PATCH /api/resumes/[id] — definir como padrão (ADR-0022)", () => {
+  it("deve marcar como padrão e devolver 200, sem renomear", async () => {
+    setDefaultResume.mockResolvedValue({ ...RENAMED, isDefault: true });
+
+    const res = await PATCH(makeRequest({ isDefault: true }), ctx("gr1"));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.isDefault).toBe(true);
+    expect(setDefaultResume).toHaveBeenCalledWith("gr1");
+    expect(renameGeneratedResume).not.toHaveBeenCalled();
+  });
+
+  it("deve responder 404 quando o id é inexistente/alheio", async () => {
+    setDefaultResume.mockResolvedValue(null);
+
+    const res = await PATCH(makeRequest({ isDefault: true }), ctx("alheio"));
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error.code).toBe("NOT_FOUND");
+  });
+
+  it("deve aceitar name + isDefault juntos (renomeia e marca padrão)", async () => {
+    renameGeneratedResume.mockResolvedValue(RENAMED);
+    setDefaultResume.mockResolvedValue({ ...RENAMED, isDefault: true });
+
+    const res = await PATCH(
+      makeRequest({ name: "Novo nome", isDefault: true }),
+      ctx("gr1"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(renameGeneratedResume).toHaveBeenCalledWith("gr1", "Novo nome");
+    expect(setDefaultResume).toHaveBeenCalledWith("gr1");
+    const json = await res.json();
+    expect(json.isDefault).toBe(true);
+  });
+
+  it("deve responder 400 quando o corpo está vazio (nem name nem isDefault)", async () => {
+    const res = await PATCH(makeRequest({}), ctx("gr1"));
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error.code).toBe("VALIDATION_ERROR");
+    expect(renameGeneratedResume).not.toHaveBeenCalled();
+    expect(setDefaultResume).not.toHaveBeenCalled();
+  });
+
+  it("deve responder 400 quando isDefault é false (só aceita true)", async () => {
+    const res = await PATCH(makeRequest({ isDefault: false }), ctx("gr1"));
+
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error.code).toBe("VALIDATION_ERROR");
+    expect(setDefaultResume).not.toHaveBeenCalled();
   });
 });
 

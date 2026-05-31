@@ -23,6 +23,7 @@ const RESUME: GeneratedResume = {
   userId: "user-local",
   name: "Currículo padrão — 30/05/2026",
   mode: "STANDARD",
+  isDefault: false,
   jobPostingId: null,
   modelId: "meta/llama-3.3-70b-instruct",
   contentJson: {

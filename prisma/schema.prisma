@@ -166,6 +166,7 @@ model GeneratedResume {
   user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name               String // nome editável do usuário (ADR-0021); default no app (rótulo do modo + data)
   mode               String // "STANDARD" | "JOB_ADAPTIVE"
+  isDefault          Boolean     @default(false) // currículo padrão do usuário (ADR-0022; no máx. 1, garantido na escrita)
   jobPostingId       String?
   jobPosting         JobPosting? @relation(fields: [jobPostingId], references: [id], onDelete: SetNull)
   modelId            String

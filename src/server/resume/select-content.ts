@@ -38,10 +38,13 @@ export async function generateStandardContent(
  * falta — nunca inventa). NÃO renderiza `.tex` nem persiste; é a ponte base+vaga →
  * conteúdo estruturado. O guardrail (US-07) roda depois, igual ao Modo 1.
  *
- * @param bundle   A base completa do usuário (fonte da verdade; input do LLM).
- * @param jobText  Texto integral da vaga colada (filtro/prioridade — não é fonte de fatos).
- * @param provider Implementação de `LLMProvider` (NIM em produção, mock nos testes).
- * @param modelId  Id de modelo opcional; repassado ao provider (default por env/catálogo).
+ * @param bundle      A base completa do usuário (fonte da verdade; input do LLM).
+ * @param jobText     Texto integral da vaga colada (filtro/prioridade — não é fonte de fatos).
+ * @param provider    Implementação de `LLMProvider` (NIM em produção, mock nos testes).
+ * @param modelId     Id de modelo opcional; repassado ao provider (default por env/catálogo).
+ * @param baseContent Conteúdo de um currículo padrão/completo do usuário (ADR-0022),
+ *                    injetado no prompt como REFERÊNCIA DE PROFUNDIDADE — não é fonte de
+ *                    fatos (o guardrail segue validando contra a `bundle`). Opcional.
  * @returns `ResumeContent` validado pelo `ResumeContentSchema` (garantido pelo provider).
  * @throws  `LLMError` (transporte ou validação) propagado do provider → mapeável a 502.
  */
@@ -50,7 +53,8 @@ export async function generateJobAdaptiveContent(
   jobText: string,
   provider: LLMProvider,
   modelId?: string,
+  baseContent?: ResumeContent,
 ): Promise<ResumeContent> {
-  const { system, user } = buildJobAdaptiveCvPrompts(bundle, jobText);
+  const { system, user } = buildJobAdaptiveCvPrompts(bundle, jobText, baseContent);
   return provider.generateResumeContent({ system, user, modelId });
 }

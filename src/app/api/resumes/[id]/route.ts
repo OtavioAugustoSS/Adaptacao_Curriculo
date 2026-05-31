@@ -9,17 +9,28 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { GeneratedResumeSchema } from "@/lib/schemas";
+import { GeneratedResumeSchema, type GeneratedResume } from "@/lib/schemas";
 import {
   renameGeneratedResume,
   deleteGeneratedResume,
+  setDefaultResume,
 } from "@/server/data/resume-repo";
 import { errorResponse, validationErrorResponse } from "@/lib/http";
 
-/** Body do PATCH: `name` obrigatório e não-vazio (após trim). */
-const RenameRequestSchema = z.object({
-  name: z.string().trim().min(1, "name é obrigatório"),
-});
+/**
+ * Body do PATCH (ADR-0021 + ADR-0022): `name` (renomear) e/ou `isDefault: true` (marcar
+ * como padrão). Ambos opcionais, mas é preciso informar PELO MENOS UM. `name`, se vier,
+ * não pode ser vazio (trim+min). `isDefault` só aceita `true` (marcar; não há "desmarcar"
+ * — trocar de padrão é marcar outro).
+ */
+const PatchRequestSchema = z
+  .object({
+    name: z.string().trim().min(1, "name não pode ser vazio").optional(),
+    isDefault: z.literal(true).optional(),
+  })
+  .refine((d) => d.name !== undefined || d.isDefault === true, {
+    message: "Informe 'name' (renomear) ou 'isDefault: true' (definir padrão).",
+  });
 
 export async function PATCH(
   req: Request,
@@ -34,22 +45,36 @@ export async function PATCH(
     return errorResponse(400, "INVALID_JSON", "Corpo da requisição não é um JSON válido.");
   }
 
-  const parsed = RenameRequestSchema.safeParse(body);
+  const parsed = PatchRequestSchema.safeParse(body);
   if (!parsed.success) {
     return validationErrorResponse(parsed.error);
   }
 
   try {
-    const updated = await renameGeneratedResume(id, parsed.data.name);
-    if (!updated) {
-      return errorResponse(404, "NOT_FOUND", "Currículo não encontrado.");
+    // Aplica as operações pedidas (uma ou ambas). Qualquer uma devolvendo `null` significa
+    // id inexistente/alheio → 404 (não vazamos a diferença, coerente com o ADR-0021).
+    let updated: GeneratedResume | null = null;
+
+    if (parsed.data.name !== undefined) {
+      updated = await renameGeneratedResume(id, parsed.data.name);
+      if (!updated) {
+        return errorResponse(404, "NOT_FOUND", "Currículo não encontrado.");
+      }
     }
+
+    if (parsed.data.isDefault === true) {
+      updated = await setDefaultResume(id);
+      if (!updated) {
+        return errorResponse(404, "NOT_FOUND", "Currículo não encontrado.");
+      }
+    }
+
     return NextResponse.json(GeneratedResumeSchema.parse(updated));
   } catch (err) {
     return errorResponse(
       500,
       "INTERNAL_ERROR",
-      "Falha ao renomear o currículo.",
+      "Falha ao atualizar o currículo.",
       process.env.NODE_ENV !== "production" ? String(err) : undefined,
     );
   }

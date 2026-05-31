@@ -13,6 +13,7 @@ const prismaMock = vi.hoisted(() => {
   const m: any = {
     generatedResume: {
       create: vi.fn(),
+      count: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
       updateMany: vi.fn(),
@@ -30,6 +31,8 @@ import {
   getGeneratedResumeById,
   renameGeneratedResume,
   deleteGeneratedResume,
+  setDefaultResume,
+  getDefaultResume,
 } from "@/server/data/resume-repo";
 import type { ResumeContent } from "@/lib/schemas";
 
@@ -58,6 +61,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     userId: "user-local",
     name: "Currículo padrão — 30/05/2026",
     mode: "STANDARD",
+    isDefault: false,
     jobPostingId: null,
     modelId: "meta/llama-3.3-70b-instruct",
     contentJson: JSON.stringify(CONTENT),
@@ -70,6 +74,9 @@ function makeRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: o usuário JÁ tem currículos → novas gerações não viram padrão automático
+  // (ADR-0022). Os testes de auto-default sobrescrevem para 0.
+  prismaMock.generatedResume.count.mockResolvedValue(1);
 });
 
 describe("createGeneratedResume — serialização", () => {
@@ -241,5 +248,115 @@ describe("deleteGeneratedResume — excluir restrito ao usuário (ADR-0021)", ()
     const result = await deleteGeneratedResume("alheio");
 
     expect(result).toBe(false);
+  });
+});
+
+describe("createGeneratedResume — currículo padrão automático (ADR-0022)", () => {
+  it("deve marcar isDefault=true quando o usuário ainda NÃO tem currículos", async () => {
+    prismaMock.generatedResume.count.mockResolvedValue(0); // primeiro currículo do usuário
+    prismaMock.generatedResume.create.mockResolvedValue(makeRow({ isDefault: true }));
+
+    await createGeneratedResume({
+      mode: "STANDARD",
+      modelId: "m",
+      content: CONTENT,
+      texOutput: "x",
+      traceabilityReport: null,
+    });
+
+    const arg = prismaMock.generatedResume.create.mock.calls[0][0];
+    expect(arg.data.isDefault).toBe(true);
+  });
+
+  it("NÃO deve marcar isDefault quando o usuário já tem currículos", async () => {
+    prismaMock.generatedResume.count.mockResolvedValue(2);
+    prismaMock.generatedResume.create.mockResolvedValue(makeRow());
+
+    await createGeneratedResume({
+      mode: "JOB_ADAPTIVE",
+      modelId: "m",
+      content: CONTENT,
+      texOutput: "x",
+      traceabilityReport: null,
+    });
+
+    const arg = prismaMock.generatedResume.create.mock.calls[0][0];
+    expect(arg.data.isDefault).toBe(false);
+  });
+});
+
+describe("setDefaultResume — define o padrão restrito ao usuário (ADR-0022)", () => {
+  it("deve marcar o alvo, zerar os OUTROS padrões e devolver o registro", async () => {
+    // 1ª updateMany: marca o alvo (count 1). 2ª updateMany: zera os demais.
+    prismaMock.generatedResume.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    prismaMock.generatedResume.findFirst.mockResolvedValue(
+      makeRow({ isDefault: true }),
+    );
+
+    const result = await setDefaultResume("gr1");
+
+    const first = prismaMock.generatedResume.updateMany.mock.calls[0][0];
+    expect(first.where).toEqual({ id: "gr1", userId: "user-local" });
+    expect(first.data).toEqual({ isDefault: true });
+
+    const second = prismaMock.generatedResume.updateMany.mock.calls[1][0];
+    expect(second.where).toEqual({
+      userId: "user-local",
+      isDefault: true,
+      NOT: { id: "gr1" },
+    });
+    expect(second.data).toEqual({ isDefault: false });
+
+    expect(result?.isDefault).toBe(true);
+  });
+
+  it("deve devolver null e NÃO zerar ninguém quando o id é inexistente/alheio", async () => {
+    prismaMock.generatedResume.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await setDefaultResume("alheio");
+
+    expect(result).toBeNull();
+    // Só a 1ª updateMany (marcar o alvo) roda; a 2ª (zerar os outros) NÃO — não deixamos
+    // o usuário sem padrão por um id inválido.
+    expect(prismaMock.generatedResume.updateMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.generatedResume.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("getDefaultResume — padrão explícito + fallback (ADR-0022)", () => {
+  it("deve devolver o currículo com isDefault=true quando existe", async () => {
+    prismaMock.generatedResume.findFirst.mockResolvedValue(
+      makeRow({ isDefault: true }),
+    );
+
+    const result = await getDefaultResume();
+
+    const arg = prismaMock.generatedResume.findFirst.mock.calls[0][0];
+    expect(arg.where).toEqual({ userId: "user-local", isDefault: true });
+    expect(result?.isDefault).toBe(true);
+  });
+
+  it("deve cair para o STANDARD mais recente quando não há padrão explícito", async () => {
+    prismaMock.generatedResume.findFirst
+      .mockResolvedValueOnce(null) // sem isDefault
+      .mockResolvedValueOnce(makeRow({ name: "Standard recente" })); // fallback
+
+    const result = await getDefaultResume();
+
+    const fallbackArg = prismaMock.generatedResume.findFirst.mock.calls[1][0];
+    expect(fallbackArg.where).toEqual({ userId: "user-local", mode: "STANDARD" });
+    expect(fallbackArg.orderBy).toEqual({ createdAt: "desc" });
+    expect(result?.name).toBe("Standard recente");
+  });
+
+  it("deve devolver null quando o usuário não tem nenhum currículo", async () => {
+    prismaMock.generatedResume.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    const result = await getDefaultResume();
+    expect(result).toBeNull();
   });
 });

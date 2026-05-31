@@ -14,7 +14,13 @@ const getProfileBundle = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/profile-repo", () => ({ getProfileBundle }));
 
 const createGeneratedResume = vi.hoisted(() => vi.fn());
-vi.mock("@/server/data/resume-repo", () => ({ createGeneratedResume }));
+const getGeneratedResumeById = vi.hoisted(() => vi.fn());
+const getDefaultResume = vi.hoisted(() => vi.fn());
+vi.mock("@/server/data/resume-repo", () => ({
+  createGeneratedResume,
+  getGeneratedResumeById,
+  getDefaultResume,
+}));
 
 const createJobPosting = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/job-repo", () => ({ createJobPosting }));
@@ -600,6 +606,74 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
     // O user prompt do Modo 2 carrega a vaga + a base (id real que vira sourceId).
     expect(params.user).toContain(JOB_TEXT);
     expect(params.user).toContain("exp-1");
+  });
+
+  it("deve carregar o currículo base (baseResumeId) e injetá-lo como referência (ADR-0022)", async () => {
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-6", rawText: JOB_TEXT });
+    generateResumeContent.mockResolvedValue(CONTENT);
+    // O currículo base selecionado tem um ResumeContent (contentJson) com marcador único.
+    getGeneratedResumeById.mockResolvedValue({
+      id: "base-1",
+      contentJson: { ...CONTENT, objective: "REFERENCIA_MARCADOR_UNICO" },
+    });
+    createGeneratedResume.mockImplementation(
+      async (input: { texOutput: string; modelId: string; mode: string; jobPostingId: string | null }) => ({
+        id: "gr-base",
+        userId: "user-local",
+        name: "Adaptado à vaga — 31/05/2026",
+        mode: input.mode,
+        jobPostingId: input.jobPostingId,
+        modelId: input.modelId,
+        contentJson: CONTENT,
+        texOutput: input.texOutput,
+        traceabilityReport: { errors: [], warnings: [] },
+        createdAt: new Date("2026-05-31T00:00:00.000Z"),
+      }),
+    );
+
+    const res = await POST(
+      makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT, baseResumeId: "base-1" }),
+    );
+
+    expect(res.status).toBe(200);
+    // Carregou o base por id, e NÃO recorreu ao padrão (baseResumeId tem prioridade).
+    expect(getGeneratedResumeById).toHaveBeenCalledWith("base-1");
+    expect(getDefaultResume).not.toHaveBeenCalled();
+    // O conteúdo do base entrou no prompt como referência de profundidade.
+    const params = generateResumeContent.mock.calls[0][0];
+    expect(params.user).toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+    expect(params.user).toContain("REFERENCIA_MARCADOR_UNICO");
+  });
+
+  it("deve recorrer ao currículo padrão quando não vem baseResumeId (ADR-0022)", async () => {
+    getProfileBundle.mockResolvedValue(BUNDLE_OK);
+    createJobPosting.mockResolvedValue({ id: "job-7", rawText: JOB_TEXT });
+    generateResumeContent.mockResolvedValue(CONTENT);
+    getDefaultResume.mockResolvedValue(null); // sem padrão → sem referência (fallback base)
+    createGeneratedResume.mockImplementation(
+      async (input: { texOutput: string; modelId: string; mode: string; jobPostingId: string | null }) => ({
+        id: "gr-nodefault",
+        userId: "user-local",
+        name: "Adaptado à vaga — 31/05/2026",
+        mode: input.mode,
+        jobPostingId: input.jobPostingId,
+        modelId: input.modelId,
+        contentJson: CONTENT,
+        texOutput: input.texOutput,
+        traceabilityReport: { errors: [], warnings: [] },
+        createdAt: new Date("2026-05-31T00:00:00.000Z"),
+      }),
+    );
+
+    const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
+
+    expect(res.status).toBe(200);
+    // Sem baseResumeId → consulta o padrão; sem padrão → sem bloco de referência.
+    expect(getDefaultResume).toHaveBeenCalledTimes(1);
+    expect(getGeneratedResumeById).not.toHaveBeenCalled();
+    const params = generateResumeContent.mock.calls[0][0];
+    expect(params.user).not.toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
   });
 
   it("deve persistir jobPostingId null quando a vaga criada não traz id (fallback ?? null)", async () => {
