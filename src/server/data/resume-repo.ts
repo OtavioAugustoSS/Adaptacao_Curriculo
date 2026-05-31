@@ -89,7 +89,7 @@ function toGeneratedResume(row: GeneratedResumeRow): GeneratedResume {
 export async function createGeneratedResume(
   input: NewGeneratedResume,
 ): Promise<GeneratedResume> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   // Default do nome (ADR-0021): rótulo do modo + data de hoje (a coluna `createdAt`
   // também usa now(), então casam na data). Nome vazio/ausente → default no servidor.
@@ -133,7 +133,7 @@ export async function renameGeneratedResume(
   id: string,
   name: string,
 ): Promise<GeneratedResume | null> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const result = await prisma.generatedResume.updateMany({
     where: { id, userId },
@@ -155,7 +155,7 @@ export async function renameGeneratedResume(
 export async function setDefaultResume(
   id: string,
 ): Promise<GeneratedResume | null> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const set = await prisma.generatedResume.updateMany({
     where: { id, userId },
@@ -178,7 +178,7 @@ export async function setDefaultResume(
  * foi apagado, `false` se id inexistente/alheio (o handler responde 404).
  */
 export async function deleteGeneratedResume(id: string): Promise<boolean> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const result = await prisma.generatedResume.deleteMany({
     where: { id, userId },
@@ -195,7 +195,7 @@ export async function deleteGeneratedResume(id: string): Promise<boolean> {
  * (contrato §2: GET /api/resumes). Sem paginação no MVP.
  */
 export async function listGeneratedResumes(): Promise<GeneratedResume[]> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const rows = await prisma.generatedResume.findMany({
     where: { userId },
@@ -213,7 +213,7 @@ export async function listGeneratedResumes(): Promise<GeneratedResume[]> {
 export async function getGeneratedResumeById(
   id: string,
 ): Promise<GeneratedResume | null> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const row = await prisma.generatedResume.findFirst({
     where: { id, userId },
@@ -231,7 +231,7 @@ export async function getGeneratedResumeById(
  * usuário não tiver nenhum currículo.
  */
 export async function getDefaultResume(): Promise<GeneratedResume | null> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const explicit = await prisma.generatedResume.findFirst({
     where: { userId, isDefault: true },

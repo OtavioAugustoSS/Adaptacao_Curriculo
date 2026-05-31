@@ -1,7 +1,11 @@
 # 0006 — Identidade via seam `getCurrentUserId()`; autenticação real adiada
 
-- **Status:** Accepted
+- **Status:** Superseded by [[0024-autenticacao-real-authjs-oauth-seam-async]]
 - **Data:** 2026-05-29
+
+> **Nota (2026-05-31):** o **padrão de seam** decidido aqui permanece válido e é o que tornou a
+> transição barata. O que o [[0024-autenticacao-real-authjs-oauth-seam-async]] supersede é apenas a
+> decisão de **adiar a autenticação real**: o seam agora é assíncrono e lê a sessão do Auth.js.
 
 ## Contexto
 

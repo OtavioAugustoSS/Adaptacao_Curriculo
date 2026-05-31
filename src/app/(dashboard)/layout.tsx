@@ -12,6 +12,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
+import { UserMenu } from "@/components/UserMenu";
 import type { ProfileBundle, GeneratedResume } from "@/lib/schemas";
 import { countBaseItems, formatItemCount } from "@/lib/presentation/base-stats";
 import { resolveTheme, THEME_STORAGE_KEY, DEFAULT_THEME, type Theme } from "@/lib/presentation/theme";
@@ -140,6 +141,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="sb-foot">
+          <UserMenu />
           <ThemeToggle theme={theme} setTheme={setTheme} />
         </div>
       </aside>

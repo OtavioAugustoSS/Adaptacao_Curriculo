@@ -16,7 +16,7 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0003](0003-ia-openai-compatible-nvidia-nim.md) | IA via cliente OpenAI-compatible → NVIDIA NIM, atrás de `LLMProvider` | Accepted |
 | [0004](0004-modelo-base-url-por-env.md) | Modelo e base-URL por variável de ambiente; catálogo em código | Accepted |
 | [0005](0005-dados-local-first-sqlite-prisma.md) | Dados local-first (SQLite/Prisma) migráveis para Postgres; `userId` em tudo | Accepted |
-| [0006](0006-identidade-seam-getcurrentuserid.md) | Identidade via seam `getCurrentUserId()`; autenticação real adiada | Accepted |
+| [0006](0006-identidade-seam-getcurrentuserid.md) | Identidade via seam `getCurrentUserId()`; autenticação real adiada | Superseded by 0024 |
 | [0007](0007-llm-json-validado-renderer-deterministico.md) | LLM produz JSON validado (Zod); `.tex` por renderer determinístico | Accepted |
 | [0008](0008-guardrail-anti-alucinacao-3-camadas.md) | Guardrail anti-alucinação em 3 camadas | Accepted |
 | [0009](0009-escape-latex-centralizado.md) | Escape LaTeX centralizado (`escapeLatex`) | Accepted |
@@ -32,6 +32,10 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0019](0019-import-perfil-por-arquivo.md) | Fatia 6: importar currículo por arquivo (PDF/DOCX/TXT) | Accepted |
 | [0020](0020-resume-content-enriquecido-geracao-completa.md) | Fatia 7: `ResumeContent` enriquecido (idiomas, cursos, bullets+stack de projeto); geração completa e fiel | Accepted |
 | [0021](0021-gestao-curriculos-nome-editar-excluir-limpar-base.md) | Fatia 7: gestão de currículos (nome/editar/excluir) e limpar a base | Accepted |
+| [0022](0022-curriculo-padrao-adaptacao-referencia-profundidade.md) | Fatia 8: currículo padrão (`isDefault`) e adaptação ancorada em referência de profundidade | Accepted |
+| [0023](0023-geracao-rica-timeout-prompts-tailoring.md) | Geração rica: timeout 180s+1retry+temp 0.3, prompts compactos, tailoring (achados do e2e real) | Accepted |
+| [0024](0024-autenticacao-real-authjs-oauth-seam-async.md) | Fatia 9: autenticação real (Auth.js/OAuth) e seam de identidade assíncrono | Accepted |
+| [0025](0025-migracao-sqlite-postgres-multiusuario.md) | Fatia 9: migração SQLite → Postgres para deploy multiusuário | Accepted |
 
 ## Template padrão de ADR
 

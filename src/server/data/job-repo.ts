@@ -48,7 +48,7 @@ function toJobPosting(row: JobPostingRow): JobPosting {
 export async function createJobPosting(input: {
   rawText: string;
 }): Promise<JobPosting> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const row = await prisma.jobPosting.create({
     data: {

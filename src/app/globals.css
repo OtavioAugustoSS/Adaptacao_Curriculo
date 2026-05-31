@@ -517,3 +517,39 @@
   .spin { animation: none; border-right-color: currentColor; opacity: .45; }
   .shortcut:hover, .cv-item:hover { transform: none; }
 }
+
+/* --- Auth (ADR-0024): menu do usuário na sidebar + página de login --- */
+.user-menu {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: 12.5px; color: var(--fg-muted);
+}
+.user-menu__name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 500; color: var(--fg);
+}
+.user-menu__signout {
+  appearance: none; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--fg-muted); font-size: 12px; font-weight: 500; padding: 5px 10px;
+  border-radius: var(--r-md); cursor: pointer; transition: .12s; flex: none;
+}
+.user-menu__signout:hover { background: var(--surface-3); color: var(--fg); }
+.user-menu--loading { opacity: .6; }
+
+.login { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--canvas); }
+.login__card {
+  width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center;
+  gap: 12px; text-align: center; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-2xl); padding: 40px 32px; box-shadow: var(--sh-lg);
+}
+.logo--lg { width: 48px; height: 48px; border-radius: 14px; font-size: 20px; }
+.login__title { font-size: 22px; font-weight: 650; letter-spacing: -.02em; margin: 4px 0 0; }
+.login__sub { font-size: 13.5px; color: var(--fg-muted); margin: 0 0 12px; line-height: 1.5; }
+.login__card form { width: 100%; }
+.login__btn {
+  width: 100%; appearance: none; cursor: pointer; padding: 11px 16px; border-radius: var(--r-lg);
+  font-size: 14px; font-weight: 600; border: 1px solid var(--border); margin-top: 8px;
+  background: var(--surface-2); color: var(--fg); transition: .12s;
+}
+.login__btn:hover { background: var(--surface-3); }
+.login__btn--google { background: var(--accent); color: var(--accent-fg); border-color: var(--accent-border); }
+.login__btn--google:hover { background: var(--accent-hover); }

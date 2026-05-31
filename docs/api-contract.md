@@ -4,7 +4,15 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-31 — **Fatia 8 (ADR-0022)** — mudanças **aditivas**.
+> Última alteração: 2026-05-31 — **Fatia 9 (ADR-0024/ADR-0025)** — mudanças **aditivas** (autenticação/infra).
+> **ADR-0024/0025 (multiusuário):** o domínio (schemas Zod + rotas de negócio) **não muda**. Adições de
+> infraestrutura: rota **`/api/auth/[...nextauth]`** (Auth.js — login OAuth Google/GitHub) e a página
+> **`/login`**; o seam `getCurrentUserId()` passa a ler a **sessão real** (assíncrono; 401 sem sessão) e o
+> banco migra **SQLite → Postgres** (`User` ganha os campos do adapter + modelos `Account`/`Session`/
+> `VerificationToken`). `ResumeContentSchema`/renderer/guardrail e todas as rotas `/api/profile`,
+> `/api/resumes*` e `/api/profile/import*` **inalterados**; invariante anti-alucinação intacto.
+>
+> 2026-05-31 — **Fatia 8 (ADR-0022)** — mudanças **aditivas**.
 > **ADR-0022:** `GeneratedResume` ganha **`isDefault: boolean`** (`z.boolean().default(false)`; resposta de
 > `GET /api/resumes` e `PATCH`) — currículo padrão do usuário (no máx. 1, garantido na escrita). **`PATCH
 > /api/resumes/[id]`** passa a aceitar **`{ name?, isDefault?: true }`** (aditivo ao rename do ADR-0021; com

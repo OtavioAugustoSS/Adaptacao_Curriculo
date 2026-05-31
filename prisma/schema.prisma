@@ -1,10 +1,15 @@
-// CV-Adapter — modelo de dados. Ver docs/erd.md.
-// MVP em SQLite; migra para Postgres trocando o provider + DATABASE_URL (ADR-0005).
-// Campos que guardam JSON (bullets, techStack, *Json, etc.) são String contendo JSON
-// serializado — portável em SQLite; na migração para Postgres podem virar Json/jsonb.
+// Forja de Currículo — modelo de dados. Ver docs/erd.md.
+// Multiusuário em Postgres (ADR-0025; antes SQLite no MVP, ADR-0005). Campos que
+// guardam JSON (bullets, techStack, *Json, etc.) seguem como String contendo JSON
+// serializado — a (de)serialização vive só nos repositórios (ADR-0005).
+//
+// Autenticação real via Auth.js/OAuth (ADR-0024): os modelos Account/Session/
+// VerificationToken são exigidos pelo @auth/prisma-adapter; o User ganha os campos
+// padrão do adapter (name/image/emailVerified). O `userId` segue em toda entidade
+// de domínio (multi-tenant), acessado sempre pelo seam getCurrentUserId().
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -12,11 +17,21 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String?  @unique
-  createdAt DateTime @default(now())
+// --- Autenticação (Auth.js / @auth/prisma-adapter) -------------------------
 
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+
+  // Auth.js
+  accounts Account[]
+  sessions Session[]
+
+  // Domínio (multi-tenant por userId)
   profile          Profile?
   experiences      Experience[]
   educations       Education[]
@@ -27,6 +42,44 @@ model User {
   jobPostings      JobPosting[]
   generatedResumes GeneratedResume[]
 }
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- Domínio ---------------------------------------------------------------
 
 model Profile {
   id        String   @id @default(cuid())

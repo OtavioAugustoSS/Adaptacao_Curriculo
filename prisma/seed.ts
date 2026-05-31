@@ -2,9 +2,15 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Cria o usuário único do MVP (LOCAL_USER_ID) com um Profile vazio.
-// É o id retornado pelo seam getCurrentUserId() enquanto não há autenticação.
+// Seed de DESENVOLVIMENTO (ADR-0024): cria o usuário do FALLBACK de dev (LOCAL_USER_ID)
+// com um Profile vazio, para trabalhar localmente sem passar pelo OAuth. Em PRODUÇÃO os
+// usuários são provisionados pelo Auth.js no 1º login — este seed não deve rodar lá.
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    console.log("Seed: ignorado em produção (usuários vêm do Auth.js).");
+    return;
+  }
+
   const id = process.env.LOCAL_USER_ID ?? "local-user";
 
   await prisma.user.upsert({

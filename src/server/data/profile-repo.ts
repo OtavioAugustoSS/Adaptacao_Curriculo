@@ -175,7 +175,7 @@ function emptyBundle(): ProfileBundle {
  * vazio (fullName em branco, listas vazias) para a tela renderizar o estado inicial.
  */
 export async function getProfileBundle(): Promise<ProfileBundle> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
 
   const row = await prisma.profile.findUnique({
     where: { userId },
@@ -195,7 +195,7 @@ export async function getProfileBundle(): Promise<ProfileBundle> {
  * `Profile` → não faz nada e retorna normalmente (o handler responde 204 de toda forma).
  */
 export async function clearProfile(): Promise<void> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
   // deleteMany não lança quando não há linha (idempotência); o cascade cuida das listas.
   await prisma.profile.deleteMany({ where: { userId } });
 }
@@ -220,7 +220,7 @@ export async function clearProfile(): Promise<void> {
  * itens REAIS lidos no momento da geração, não ids persistidos de versões antigas).
  */
 export async function saveProfileBundle(bundle: ProfileBundle): Promise<ProfileBundle> {
-  const userId = getCurrentUserId();
+  const userId = await getCurrentUserId();
   const p = bundle.profile;
 
   const profileData = {
