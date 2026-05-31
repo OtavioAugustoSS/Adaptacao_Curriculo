@@ -28,6 +28,10 @@ const saveProfileBundle = vi.hoisted(() => vi.fn());
 const getProfileBundle = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/profile-repo", () => ({ saveProfileBundle, getProfileBundle }));
 
+// Identidade + rate limit (ADR-0028): a rota lê o userId e limita. Mock do seam + reset do limiter.
+vi.mock("@/server/auth/getCurrentUserId", () => ({ getCurrentUserId: () => "user-test" }));
+import { __resetRateLimit } from "@/lib/rate-limit";
+
 import { POST } from "@/app/api/profile/import/route";
 
 // --- Helpers ----------------------------------------------------------------
@@ -67,6 +71,7 @@ const RAW_TEXT = "Otávio. Cursando BSc na USP desde 2022.";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetRateLimit();
 });
 
 describe("POST /api/profile/import — validação do request", () => {

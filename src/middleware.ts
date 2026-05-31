@@ -31,7 +31,7 @@ export default auth((req) => {
   return NextResponse.redirect(url);
 });
 
-// Roda em tudo, exceto: o próprio fluxo de auth, assets do Next e o favicon.
+// Roda em tudo, exceto: o fluxo de auth, o health check (público, ADR-0028), assets e favicon.
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/health|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -9,8 +9,12 @@
 // de domínio (multi-tenant), acessado sempre pelo seam getCurrentUserId().
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // App: URL POOLED (PgBouncer do Neon) — aguenta concorrência sem esgotar conexões (ADR-0028).
+  url       = env("DATABASE_URL")
+  // Migrações: conexão DIRETA (PgBouncer não suporta DDL/transações de migração). Em dev pode
+  // ser igual à DATABASE_URL; no Neon, use a connection string "direct".
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {

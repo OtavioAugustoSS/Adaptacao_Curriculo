@@ -4,7 +4,12 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-31 — **Fatia 10 (ADR-0026/ADR-0027)** — mudanças **aditivas/comportamentais**, contrato de domínio **inalterado**.
+> Última alteração: 2026-05-31 — **Fatia 11 (ADR-0028)** — produção; mudanças **aditivas**, domínio inalterado.
+> **ADR-0028:** rota nova pública **`GET /api/health`** → `{ ok: true }` (fora do middleware). As rotas caras
+> **`POST /api/resumes/generate`** e **`POST /api/profile/import*`** ganham **rate limit por usuário** →
+> **`429 TOO_MANY_REQUESTS`** (envelope padrão) ao exceder. Nenhum schema/rota de domínio muda.
+>
+> 2026-05-31 — **Fatia 10 (ADR-0026/ADR-0027)** — mudanças **aditivas/comportamentais**, contrato de domínio **inalterado**.
 > **ADR-0026:** rotas **`/api/*`** sem sessão passam a responder **`401` com envelope JSON** `{ error: { code:
 > "UNAUTHENTICATED", ... } }` (antes redirecionavam para `/login` em HTML) — refina o middleware da F9.
 > **ADR-0027 (adaptação à vaga):** o Modo 2 vira pipeline de **2 passos** (análise da vaga → adaptação); a

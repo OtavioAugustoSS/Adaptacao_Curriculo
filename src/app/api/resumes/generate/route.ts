@@ -24,6 +24,8 @@ import {
   type TraceabilityReport,
 } from "@/lib/schemas";
 import { errorResponse, validationErrorResponse } from "@/lib/http";
+import { getCurrentUserId } from "@/server/auth/getCurrentUserId";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getProfileBundle } from "@/server/data/profile-repo";
 import { createGeneratedResume } from "@/server/data/resume-repo";
 import { createJobPosting } from "@/server/data/job-repo";
@@ -76,6 +78,23 @@ async function generateWithGuardrail(
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit por usuário (ADR-0028): a geração é a rota mais cara (2–3 chamadas à NIM, chave
+  // compartilhada). Protege cota/custo/carga. O middleware já garante a sessão; aqui só lemos o id.
+  let rlUserId: string;
+  try {
+    rlUserId = await getCurrentUserId();
+  } catch {
+    return errorResponse(401, "UNAUTHENTICATED", "Não autenticado.");
+  }
+  const rl = checkRateLimit(`generate:${rlUserId}`, 5, 5 * 60_000);
+  if (!rl.ok) {
+    return errorResponse(
+      429,
+      "TOO_MANY_REQUESTS",
+      `Muitas gerações em pouco tempo. Tente novamente em ~${rl.retryAfterSec}s.`,
+    );
+  }
+
   // 1. Corpo JSON + validação do contrato.
   let body: unknown;
   try {

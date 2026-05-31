@@ -18,6 +18,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { errorResponse } from "@/lib/http";
+import { getCurrentUserId } from "@/server/auth/getCurrentUserId";
+import { checkRateLimit } from "@/lib/rate-limit";
 import {
   isAcceptedImportFile,
   MAX_IMPORT_FILE_BYTES,
@@ -31,6 +33,22 @@ import { resolveModel } from "@/server/llm/models";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  // Rate limit por usuário (ADR-0028): mesmo bucket "import" do texto. Protege cota/custo/carga da NIM.
+  let rlUserId: string;
+  try {
+    rlUserId = await getCurrentUserId();
+  } catch {
+    return errorResponse(401, "UNAUTHENTICATED", "Não autenticado.");
+  }
+  const rl = checkRateLimit(`import:${rlUserId}`, 10, 5 * 60_000);
+  if (!rl.ok) {
+    return errorResponse(
+      429,
+      "TOO_MANY_REQUESTS",
+      `Muitas importações em pouco tempo. Tente novamente em ~${rl.retryAfterSec}s.`,
+    );
+  }
+
   // 1. Lê o multipart e pega o campo `file`.
   let file: File;
   try {

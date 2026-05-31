@@ -31,6 +31,11 @@ vi.mock("@/server/llm", () => ({
   getLLMProvider: () => ({ generateResumeContent, analyzeJob }),
 }));
 
+// Identidade + rate limit (ADR-0028): a rota agora lê o userId e limita. Mockamos o seam e
+// resetamos o limiter (estado em memória) entre testes.
+vi.mock("@/server/auth/getCurrentUserId", () => ({ getCurrentUserId: () => "user-test" }));
+import { __resetRateLimit } from "@/lib/rate-limit";
+
 import { POST } from "@/app/api/resumes/generate/route";
 
 // --- Helpers ----------------------------------------------------------------
@@ -130,6 +135,7 @@ const CONTENT_EDU: ResumeContent = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetRateLimit();
 });
 
 describe("POST /api/resumes/generate — validação do request", () => {

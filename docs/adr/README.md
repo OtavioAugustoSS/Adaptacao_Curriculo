@@ -38,6 +38,7 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0025](0025-migracao-sqlite-postgres-multiusuario.md) | Fatia 9: migração SQLite → Postgres para deploy multiusuário | Accepted |
 | [0026](0026-api-401-json-sob-auth.md) | Fatia 10: rotas de API retornam 401 JSON sob auth (não redirecionam) | Accepted |
 | [0027](0027-adaptacao-vaga-2-passos-prompt-rearquitetado.md) | Fatia 10: adaptação à vaga em 2 passos (análise→adaptação) + prompt re-arquitetado | Accepted |
+| [0028](0028-deploy-producao-host-persistente-rate-limit-seguranca.md) | Fatia 11: deploy de produção — host persistente (Render), pooling, rate limit, segurança | Accepted |
 
 ## Template padrão de ADR
 

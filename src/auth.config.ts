@@ -10,6 +10,10 @@ import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 
 export const authConfig = {
+  // Confia no host do proxy (Render/Vercel) — sem isto o callback OAuth pode falhar atrás de
+  // proxy (ADR-0028). `AUTH_URL` (env) define a URL pública canônica em produção.
+  trustHost: true,
+
   // Provedores OAuth. As credenciais vêm por env auto-detectada pelo Auth.js:
   // AUTH_GOOGLE_ID/SECRET e AUTH_GITHUB_ID/SECRET (ADR-0024).
   providers: [Google, GitHub],

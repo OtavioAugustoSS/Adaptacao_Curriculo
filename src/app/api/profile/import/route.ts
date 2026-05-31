@@ -16,12 +16,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ProfileImportRequestSchema } from "@/lib/schemas";
 import { errorResponse, validationErrorResponse } from "@/lib/http";
+import { getCurrentUserId } from "@/server/auth/getCurrentUserId";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { extractProfileFromDump } from "@/server/profile/extract-profile";
 import { getLLMProvider } from "@/server/llm";
 import { LLMError } from "@/server/llm/provider";
 import { resolveModel } from "@/server/llm/models";
 
 export async function POST(req: NextRequest) {
+  // Rate limit por usuário (ADR-0028): o import chama a NIM (chave compartilhada). Protege cota/custo/carga.
+  let rlUserId: string;
+  try {
+    rlUserId = await getCurrentUserId();
+  } catch {
+    return errorResponse(401, "UNAUTHENTICATED", "Não autenticado.");
+  }
+  const rl = checkRateLimit(`import:${rlUserId}`, 10, 5 * 60_000);
+  if (!rl.ok) {
+    return errorResponse(
+      429,
+      "TOO_MANY_REQUESTS",
+      `Muitas importações em pouco tempo. Tente novamente em ~${rl.retryAfterSec}s.`,
+    );
+  }
+
   // 1. Corpo JSON.
   let body: unknown;
   try {

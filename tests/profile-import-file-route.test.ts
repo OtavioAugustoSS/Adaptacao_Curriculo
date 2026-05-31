@@ -36,6 +36,10 @@ const saveProfileBundle = vi.hoisted(() => vi.fn());
 const getProfileBundle = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/profile-repo", () => ({ saveProfileBundle, getProfileBundle }));
 
+// Identidade + rate limit (ADR-0028): a rota lê o userId e limita. Mock do seam + reset do limiter.
+vi.mock("@/server/auth/getCurrentUserId", () => ({ getCurrentUserId: () => "user-test" }));
+import { __resetRateLimit } from "@/lib/rate-limit";
+
 import { POST } from "@/app/api/profile/import/file/route";
 
 // --- Helpers ----------------------------------------------------------------
@@ -83,6 +87,7 @@ const PDF_BYTES = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // "%PDF"
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetRateLimit();
 });
 
 describe("POST /api/profile/import/file — caminho feliz", () => {
