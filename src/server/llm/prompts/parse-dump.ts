@@ -23,6 +23,12 @@ REGRA INEGOCIÁVEL — NÃO INVENTE NADA:
 - Na dúvida, prefira deixar VAZIO a preencher com algo que o texto não diz.
 - Apenas distribua a informação real do texto nos campos certos; pode normalizar a redação (corrigir capitalização, separar itens), nunca adicionar fatos.
 
+COMPLETUDE — CAPTURE TUDO o que o texto traz:
+- Extraia TODAS as experiências, formações, habilidades, projetos, idiomas e cursos/certificações que aparecem no texto. NÃO resuma nem omita itens reais.
+- Para cada experiência e cada projeto, capture TODOS os bullets/realizações que o texto lista (um por item da lista), sem condensar vários em um.
+- Para cada projeto, capture TODAS as tecnologias citadas em "techStack" e todos os destaques em "bullets".
+- Capture TODOS os idiomas (com a proficiência se o texto disser) e TODOS os cursos/certificações (título, emissor e data quando o texto trouxer).
+
 FORMATO DA SAÍDA — responda ESTRITAMENTE com um único objeto JSON (sem markdown, sem comentários, sem texto fora do JSON), SEM nenhum id (não inclua "id", "userId" nem "profileId" em lugar algum), neste formato:
 {
   "profile": { "fullName": string, "phone"?: string, "location"?: string, "email"?: string, "linkedin"?: string, "github"?: string, "website"?: string, "summary"?: string },

@@ -186,6 +186,20 @@ export async function getProfileBundle(): Promise<ProfileBundle> {
   return toBundle(row);
 }
 
+/**
+ * Limpa a base do usuário atual (ADR-0021 — DELETE /api/profile): apaga o `Profile`,
+ * e o `onDelete: Cascade` do Prisma derruba as 6 listas (experiences, educations,
+ * skills, projects, languages, courses). GeneratedResume/JobPosting referenciam o
+ * `User`, NÃO o `Profile` → SOBREVIVEM (correto: limpar a base não apaga o histórico).
+ * Depois, `getProfileBundle` volta a devolver `emptyBundle()`. IDEMPOTENTE: sem
+ * `Profile` → não faz nada e retorna normalmente (o handler responde 204 de toda forma).
+ */
+export async function clearProfile(): Promise<void> {
+  const userId = getCurrentUserId();
+  // deleteMany não lança quando não há linha (idempotência); o cascade cuida das listas.
+  await prisma.profile.deleteMany({ where: { userId } });
+}
+
 // ---------------------------------------------------------------------------
 // Escrita (upsert transacional do bundle completo)
 // ---------------------------------------------------------------------------

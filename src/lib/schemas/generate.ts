@@ -17,6 +17,9 @@ export const GenerateRequestSchema = z
   .object({
     mode: GenerationModeSchema,
     jobText: z.string().optional(),
+    // Nome opcional do currículo (ADR-0021). Ausente → o servidor aplica o default
+    // (rótulo do modo + data). String vazia também cai no default no servidor.
+    name: z.string().optional(),
   })
   .refine(
     (data) =>
@@ -55,6 +58,8 @@ export type TraceabilityReport = z.infer<typeof TraceabilityReportSchema>;
 export const GeneratedResumeSchema = z.object({
   id: z.string(),
   userId: z.string().optional(),
+  /** Nome editável do usuário (ADR-0021); default no servidor (rótulo do modo + data). */
+  name: z.string(),
   mode: GenerationModeSchema,
   jobPostingId: z.string().nullable().optional(),
   modelId: z.string(),

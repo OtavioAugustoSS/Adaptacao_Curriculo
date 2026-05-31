@@ -21,6 +21,7 @@ function ctx(id: string) {
 const RESUME: GeneratedResume = {
   id: "gr1",
   userId: "user-local",
+  name: "Currículo padrão — 30/05/2026",
   mode: "STANDARD",
   jobPostingId: null,
   modelId: "meta/llama-3.3-70b-instruct",
@@ -30,6 +31,8 @@ const RESUME: GeneratedResume = {
     skills: [],
     experience: [],
     projects: [],
+    languages: [],
+    courses: [],
   },
   texOutput: "\\documentclass{resume}\n\\begin{document}\\end{document}",
   traceabilityReport: null,

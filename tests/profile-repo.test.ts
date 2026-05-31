@@ -18,7 +18,7 @@ vi.mock("@/server/auth/getCurrentUserId", () => ({
 // tanto na factory quanto nos testes.
 const prismaMock = vi.hoisted(() => {
   const m: any = {
-    profile: { findUnique: vi.fn(), upsert: vi.fn() },
+    profile: { findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
     user: { upsert: vi.fn() },
     experience: { deleteMany: vi.fn(), createMany: vi.fn() },
     education: { deleteMany: vi.fn(), createMany: vi.fn() },
@@ -34,7 +34,7 @@ const prismaMock = vi.hoisted(() => {
 
 vi.mock("@/server/db", () => ({ prisma: prismaMock }));
 
-import { getProfileBundle, saveProfileBundle } from "@/server/data/profile-repo";
+import { getProfileBundle, saveProfileBundle, clearProfile } from "@/server/data/profile-repo";
 
 // Linha de Profile crua (formato Prisma) com listas; campos opcionais como null.
 function makeProfileRow(overrides: Record<string, unknown> = {}) {
@@ -303,6 +303,25 @@ describe("saveProfileBundle — serialização e contrato de escrita", () => {
     // A formação em andamento (US-12) é persistida com current=true (sem perder o flag).
     const arg = prismaMock.education.createMany.mock.calls[0][0];
     expect(arg.data[0].current).toBe(true);
+  });
+});
+
+describe("clearProfile — limpar a base (US-16, ADR-0021)", () => {
+  it("deve apagar o Profile do usuário atual (cascade derruba as listas)", async () => {
+    prismaMock.profile.deleteMany.mockResolvedValue({ count: 1 });
+
+    await clearProfile();
+
+    // Restrito ao usuário atual; o cascade do Prisma cuida das 6 listas.
+    expect(prismaMock.profile.deleteMany).toHaveBeenCalledWith({
+      where: { userId: "user-local" },
+    });
+  });
+
+  it("deve ser idempotente: sem Profile não lança (deleteMany count 0)", async () => {
+    prismaMock.profile.deleteMany.mockResolvedValue({ count: 0 });
+
+    await expect(clearProfile()).resolves.toBeUndefined();
   });
 });
 

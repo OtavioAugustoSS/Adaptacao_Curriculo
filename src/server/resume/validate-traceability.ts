@@ -178,9 +178,12 @@ function buildBaseCorpus(bundle: ProfileBundle): string {
 }
 
 /**
- * Avisos de NÚMERO (ADR-0015): tokens numéricos que aparecem em `objective` e nos
- * `bullets` da saída e NÃO existem como substring no corpus normalizado da base →
- * "número possivelmente novo" (revisável). Conservador: surfa para o usuário.
+ * Avisos de NÚMERO (ADR-0015 + ADR-0020): tokens numéricos que aparecem em `objective`,
+ * nos bullets de experiência, na descrição e nos `bullets` de PROJETO da saída e NÃO
+ * existem como substring no corpus normalizado da base → "número possivelmente novo"
+ * (revisável). Conservador: surfa para o usuário. Os bullets de projeto entram aqui
+ * (ADR-0020 §3) com a MESMA regra dos bullets de experiência — não podem ser uma zona
+ * cega onde número fabricado passa sem aviso.
  */
 function checkNumbers(content: ResumeContent, corpus: string): Issue[] {
   const issues: Issue[] = [];
@@ -207,6 +210,8 @@ function checkNumbers(content: ResumeContent, corpus: string): Issue[] {
   });
   content.projects.forEach((proj, i) => {
     scan(proj.description, `projects[${i}].description`);
+    // `?? []`: bullets tem default [] no schema; protege contra ResumeContent não-parseado.
+    (proj.bullets ?? []).forEach((b, j) => scan(b, `projects[${i}].bullets[${j}]`));
   });
 
   return issues;
@@ -230,6 +235,77 @@ function checkSkills(content: ResumeContent, bundle: ProfileBundle): Issue[] {
         });
       }
     });
+  });
+
+  return issues;
+}
+
+/**
+ * Avisos de TECNOLOGIA (ADR-0020 §3): cada item de `projects[].techStack` cujo nome
+ * normalizado NÃO apareça no corpus da base → "tecnologia possivelmente nova". Mesmo
+ * critério conservador das skills (surfa, não bloqueia). O `buildBaseCorpus` já inclui
+ * o techStack da base, então técnicas reais passam sem aviso. Comparamos por substring
+ * (coerente com a checagem de número), tolerando o techStack vir embutido em texto.
+ */
+function checkTechStack(content: ResumeContent, corpus: string): Issue[] {
+  const issues: Issue[] = [];
+
+  content.projects.forEach((proj, i) => {
+    (proj.techStack ?? []).forEach((tech, j) => {
+      const norm = normalize(tech);
+      if (norm.length > 0 && !corpus.includes(norm)) {
+        issues.push({
+          field: `projects[${i}].techStack[${j}]`,
+          value: tech,
+          reason: "tecnologia possivelmente nova (não encontrada na base)",
+        });
+      }
+    });
+  });
+
+  return issues;
+}
+
+/**
+ * Avisos de IDIOMA (ADR-0020 §3): cada `languages[].name` cujo nome normalizado NÃO
+ * case com nenhum `Language.name` da base → "idioma possivelmente novo". NÃO é erro
+ * forte (ver ADR-0020: strings curtas/ruidosas; preferir surfar a bloquear). A
+ * `proficiency` NÃO é rastreada como entidade.
+ */
+function checkLanguages(content: ResumeContent, bundle: ProfileBundle): Issue[] {
+  const issues: Issue[] = [];
+  const baseLanguages = new Set(bundle.languages.map((l) => normalize(l.name)));
+
+  (content.languages ?? []).forEach((lang, i) => {
+    if (!baseLanguages.has(normalize(lang.name))) {
+      issues.push({
+        field: `languages[${i}].name`,
+        value: lang.name,
+        reason: "idioma possivelmente novo (não encontrado na base)",
+      });
+    }
+  });
+
+  return issues;
+}
+
+/**
+ * Avisos de CURSO (ADR-0020 §3): cada `courses[].title` cujo título normalizado NÃO
+ * case com nenhum `Course.title` da base → "curso possivelmente novo". NÃO é erro
+ * forte (ver ADR-0020). `issuer`/`date`/`url` NÃO são rastreados como entidade.
+ */
+function checkCourses(content: ResumeContent, bundle: ProfileBundle): Issue[] {
+  const issues: Issue[] = [];
+  const baseCourses = new Set(bundle.courses.map((c) => normalize(c.title)));
+
+  (content.courses ?? []).forEach((course, i) => {
+    if (!baseCourses.has(normalize(course.title))) {
+      issues.push({
+        field: `courses[${i}].title`,
+        value: course.title,
+        reason: "curso possivelmente novo (não encontrado na base)",
+      });
+    }
   });
 
   return issues;
@@ -261,6 +337,9 @@ export function validateTraceability(
   const warnings: Issue[] = [
     ...checkNumbers(content, corpus),
     ...checkSkills(content, bundle),
+    ...checkTechStack(content, corpus),
+    ...checkLanguages(content, bundle),
+    ...checkCourses(content, bundle),
   ];
 
   return { errors, warnings };

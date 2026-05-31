@@ -21,6 +21,22 @@ export function resumeModeBadge(mode: Mode): string {
 }
 
 /**
+ * Nome DEFAULT de um currículo gerado (ADR-0021): rótulo do modo + data dd/mm/aaaa.
+ * Ex.: "Currículo padrão — 30/05/2026" / "Adaptado à vaga — 30/05/2026". Usado no
+ * servidor quando o request não traz `name`; espelha o backfill da migração. Função
+ * PURA (recebe a data) — testável sem relógio. Data inválida → só o rótulo do modo.
+ */
+export function defaultResumeName(mode: Mode, when: string | Date): string {
+  const label = mode === "JOB_ADAPTIVE" ? "Adaptado à vaga" : "Currículo padrão";
+  const date = typeof when === "string" ? new Date(when) : when;
+  if (Number.isNaN(date.getTime())) return label;
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${label} — ${dd}/${mm}/${yyyy}`;
+}
+
+/**
  * Avisos exibíveis na UI: SÓ `warnings` (nunca `errors` — estes disparam regeneração
  * no backend e jamais chegam à tela). Relatório ausente → lista vazia.
  */

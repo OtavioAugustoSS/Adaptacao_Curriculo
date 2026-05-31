@@ -14,6 +14,7 @@ import { GET } from "@/app/api/resumes/route";
 const RESUME: GeneratedResume = {
   id: "gr1",
   userId: "user-local",
+  name: "Currículo padrão — 30/05/2026",
   mode: "STANDARD",
   jobPostingId: null,
   modelId: "meta/llama-3.3-70b-instruct",
@@ -25,6 +26,8 @@ const RESUME: GeneratedResume = {
       { sourceId: "exp-1", role: "Dev", company: "Acme", period: "2020", bullets: ["fez A"] },
     ],
     projects: [],
+    languages: [],
+    courses: [],
   },
   texOutput: "\\documentclass{resume}",
   traceabilityReport: { errors: [], warnings: [] },

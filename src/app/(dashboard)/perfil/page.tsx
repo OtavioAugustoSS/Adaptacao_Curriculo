@@ -131,8 +131,14 @@ function emptyBundle(): ProfileBundle {
 }
 
 // Estado do painel "Importar com IA" (US-11). O import NÃO persiste — devolve um
-// rascunho que MESCLAMOS no formulário; o usuário revisa e usa o "Salvar" normal.
+// rascunho que MESCLAMOS (ou SUBSTITUÍMOS, Fatia 7 / WS5) no formulário; o usuário
+// revisa e usa o "Salvar" normal.
 type ImportStatus = "idle" | "sending" | "error";
+
+// Modo do import (WS5): "merge" acrescenta o rascunho ao que já existe (padrão, US-11);
+// "replace" descarta a base atual no formulário e usa só o rascunho (o usuário revisa
+// e Salva). Aplica-se tanto ao import por texto quanto por arquivo.
+type ImportMode = "merge" | "replace";
 
 export default function PerfilPage() {
   const [bundle, setBundle] = useState<ProfileBundle>(emptyBundle());
@@ -145,6 +151,8 @@ export default function PerfilPage() {
   const [dumpText, setDumpText] = useState("");
   const [importStatus, setImportStatus] = useState<ImportStatus>("idle");
   const [importError, setImportError] = useState<string | null>(null);
+  // Mesclar (padrão) x Substituir o rascunho importado (WS5).
+  const [importMode, setImportMode] = useState<ImportMode>("merge");
 
   // Import por ARQUIVO (US-13): mesmo painel, entrada paralela à textarea. Estados
   // próprios para não interferir no fluxo de texto. O ref permite limpar o input no sucesso.
@@ -250,6 +258,30 @@ export default function PerfilPage() {
     }
   }
 
+  // WS5 — limpa a base (DELETE /api/profile): apaga o Profile no servidor (cascade nas
+  // 6 listas) e reseta o formulário para o estado vazio. O histórico de currículos não
+  // é afetado. Confirmação explícita (ação destrutiva — ADR-0021).
+  async function handleClearBase() {
+    const ok = window.confirm(
+      "Limpar toda a sua base? Isso apaga cabeçalho, experiências, formações, habilidades, " +
+        "projetos, idiomas e cursos. Os currículos já gerados NÃO são afetados. Esta ação não " +
+        "pode ser desfeita.",
+    );
+    if (!ok) return;
+
+    setErrorMsg(null);
+    setFieldErrors([]);
+    try {
+      const res = await fetch("/api/profile", { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      setBundle(emptyBundle());
+      setStatus("ready");
+    } catch {
+      setErrorMsg("Falha ao limpar a base. Tente novamente.");
+      setStatus("error");
+    }
+  }
+
   // US-11 — importa um rascunho da IA e MESCLA no bundle atual (nada é apagado):
   // - listas: ACRESCENTA os itens do rascunho aos existentes (concatena);
   // - cabeçalho: preenche cada campo só se o atual estiver VAZIO (não sobrescreve).
@@ -281,7 +313,8 @@ export default function PerfilPage() {
       }
 
       const draft = (await res.json()) as ProfileBundle;
-      setBundle((prev) => mergeDraft(prev, draft));
+      // WS5: Substituir descarta a base atual no formulário; Mesclar acrescenta (US-11).
+      setBundle((prev) => (importMode === "replace" ? draft : mergeDraft(prev, draft)));
       setDumpText("");
       setImportStatus("idle");
       setImportOpen(false);
@@ -331,7 +364,8 @@ export default function PerfilPage() {
       }
 
       const draft = (await res.json()) as ProfileBundle;
-      setBundle((prev) => mergeDraft(prev, draft));
+      // WS5: Substituir descarta a base atual no formulário; Mesclar acrescenta (US-11).
+      setBundle((prev) => (importMode === "replace" ? draft : mergeDraft(prev, draft)));
       setFileName(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setFileStatus("idle");
@@ -419,6 +453,39 @@ export default function PerfilPage() {
               revisar. Nada é salvo automaticamente, e a IA usa apenas o que está no conteúdo
               enviado — não inventa.
             </p>
+
+            {/* WS5: Mesclar (acrescenta) x Substituir (descarta o atual no formulário). */}
+            <div className="field">
+              <span className="label">Ao importar</span>
+              <div className="tabs" role="tablist" aria-label="Modo de importação" style={{ maxWidth: 360 }}>
+                <button
+                  type="button"
+                  className="tab"
+                  role="tab"
+                  aria-selected={importMode === "merge"}
+                  onClick={() => setImportMode("merge")}
+                  disabled={importStatus === "sending" || fileStatus === "sending"}
+                >
+                  Mesclar
+                </button>
+                <button
+                  type="button"
+                  className="tab"
+                  role="tab"
+                  aria-selected={importMode === "replace"}
+                  onClick={() => setImportMode("replace")}
+                  disabled={importStatus === "sending" || fileStatus === "sending"}
+                >
+                  Substituir
+                </button>
+              </div>
+              <span className="help">
+                {importMode === "merge"
+                  ? "Acrescenta o que for importado ao que já está no formulário."
+                  : "Descarta o conteúdo atual do formulário e usa só o importado (você revisa e salva)."}
+              </span>
+            </div>
+
             <div className="field">
               <label className="label" htmlFor="import-dump">
                 Seu texto
@@ -695,6 +762,14 @@ export default function PerfilPage() {
             <Icon name="alert" size={13} /> Erro de validação
           </span>
         )}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleClearBase}
+          disabled={status === "saving"}
+        >
+          <Icon name="trash" size={13} /> Limpar base
+        </button>
         <button type="button" className="btn btn-primary" onClick={handleSave} disabled={status === "saving"}>
           {status === "saving" ? "Salvando…" : "Salvar"}
         </button>

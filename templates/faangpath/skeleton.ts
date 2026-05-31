@@ -4,13 +4,22 @@
 // O renderer completo (ResumeContent -> .tex) é implementado na Fatia 1 em
 // src/server/resume/render-latex.ts e usa estes helpers.
 
-/** Preâmbulo: classe resume, margens, macros \name e \address. */
+/**
+ * Preâmbulo: classe resume, margens, cor de link discreta, macros \name e \address.
+ *
+ * O `resume.cls` faangpath (vive no Overleaf) carrega o `hyperref` com a cor de link
+ * ROSA padrão. Sobrescrevemos aqui — sem tocar no `.cls` — definindo `cvlink` num
+ * azul-marinho escuro discreto e ligando `colorlinks` para url/link/cite (ADR-0020 /
+ * Fatia 7). O `\definecolor` precisa do pacote `xcolor`, que o `hyperref` já puxa.
+ */
 export function preamble(name: string, addressLines: string[]): string {
   const addresses = addressLines
     .map((line) => `\\address{${line}}`)
     .join("\n");
   return `\\documentclass{resume}
 \\usepackage[left=0.4in,top=0.4in,right=0.4in,bottom=0.4in]{geometry}
+\\definecolor{cvlink}{HTML}{1F3A5F}
+\\hypersetup{colorlinks=true, urlcolor=cvlink, linkcolor=cvlink, citecolor=cvlink}
 \\name{${name}}
 ${addresses}
 `;

@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return validationErrorResponse(parsed.error);
   }
-  const { mode } = parsed.data;
+  const { mode, name } = parsed.data;
 
   try {
     // 2. Base + pré-requisito (ADR-0014/0016: o mesmo nos dois modos). Bem-formado
@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
     //    No Modo 2 grava o jobPostingId (ADR-0016).
     const saved = await createGeneratedResume({
       mode,
+      name, // ausente/vazio → default no repo (rótulo do modo + data; ADR-0021)
       jobPostingId,
       modelId,
       content: result.content,

@@ -15,6 +15,8 @@ const prismaMock = vi.hoisted(() => {
       create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      updateMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
   };
   return m;
@@ -26,6 +28,8 @@ import {
   createGeneratedResume,
   listGeneratedResumes,
   getGeneratedResumeById,
+  renameGeneratedResume,
+  deleteGeneratedResume,
 } from "@/server/data/resume-repo";
 import type { ResumeContent } from "@/lib/schemas";
 
@@ -43,6 +47,8 @@ const CONTENT: ResumeContent = {
     },
   ],
   projects: [],
+  languages: [],
+  courses: [],
 };
 
 // Linha crua de GeneratedResume (formato Prisma: campos JSON como String).
@@ -50,6 +56,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "gr1",
     userId: "user-local",
+    name: "Currículo padrão — 30/05/2026",
     mode: "STANDARD",
     jobPostingId: null,
     modelId: "meta/llama-3.3-70b-instruct",
@@ -188,5 +195,51 @@ describe("getGeneratedResumeById — leitura por id", () => {
     prismaMock.generatedResume.findFirst.mockResolvedValue(null);
     const result = await getGeneratedResumeById("inexistente");
     expect(result).toBeNull();
+  });
+});
+
+describe("renameGeneratedResume — renomear restrito ao usuário (ADR-0021)", () => {
+  it("deve atualizar o name restrito a { id, userId } e devolver o registro", async () => {
+    prismaMock.generatedResume.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.generatedResume.findFirst.mockResolvedValue(
+      makeRow({ name: "Novo nome" }),
+    );
+
+    const result = await renameGeneratedResume("gr1", "Novo nome");
+
+    const arg = prismaMock.generatedResume.updateMany.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: "gr1", userId: "user-local" });
+    expect(arg.data).toEqual({ name: "Novo nome" });
+    expect(result?.name).toBe("Novo nome");
+  });
+
+  it("deve devolver null quando nada foi atualizado (id inexistente/alheio)", async () => {
+    prismaMock.generatedResume.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await renameGeneratedResume("alheio", "X");
+
+    expect(result).toBeNull();
+    // Não busca o registro quando nada mudou (evita ler de outro usuário).
+    expect(prismaMock.generatedResume.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteGeneratedResume — excluir restrito ao usuário (ADR-0021)", () => {
+  it("deve apagar restrito a { id, userId } e devolver true quando algo foi apagado", async () => {
+    prismaMock.generatedResume.deleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await deleteGeneratedResume("gr1");
+
+    const arg = prismaMock.generatedResume.deleteMany.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: "gr1", userId: "user-local" });
+    expect(result).toBe(true);
+  });
+
+  it("deve devolver false quando nada foi apagado (id inexistente/alheio)", async () => {
+    prismaMock.generatedResume.deleteMany.mockResolvedValue({ count: 0 });
+
+    const result = await deleteGeneratedResume("alheio");
+
+    expect(result).toBe(false);
   });
 });

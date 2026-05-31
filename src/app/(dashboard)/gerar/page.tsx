@@ -21,7 +21,8 @@ import { useEffect, useState } from "react";
 import type { ProfileBundle, GeneratedResume } from "@/lib/schemas";
 import { Icon } from "@/components/Icon";
 import { TexCode } from "@/components/TexCode";
-import { resumeModeLabel, visibleWarnings } from "@/lib/presentation/resume-meta";
+import { visibleWarnings } from "@/lib/presentation/resume-meta";
+import { OVERLEAF_PROJECT_URL, OVERLEAF_BUTTON_LABEL } from "@/lib/overleaf";
 
 // Estados da tela (spec §2.2): ocioso, validando pré-requisito, gerando (loading),
 // preview, erro (com retry).
@@ -35,6 +36,7 @@ export default function GerarPage() {
   const [canGenerate, setCanGenerate] = useState(false);
   const [mode, setMode] = useState<Mode>("STANDARD");
   const [jobText, setJobText] = useState("");
+  const [name, setName] = useState("");
   const [resume, setResume] = useState<GeneratedResume | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -75,12 +77,16 @@ export default function GerarPage() {
     setCopied(false);
     setStatus("generating");
     try {
+      // Nome opcional: só vai no corpo se preenchido (ADR-0021 — senão default no servidor).
+      const trimmedName = name.trim();
+      const payload: { mode: Mode; jobText?: string; name?: string } =
+        mode === "JOB_ADAPTIVE" ? { mode: "JOB_ADAPTIVE", jobText } : { mode: "STANDARD" };
+      if (trimmedName) payload.name = trimmedName;
+
       const res = await fetch("/api/resumes/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          mode === "JOB_ADAPTIVE" ? { mode: "JOB_ADAPTIVE", jobText } : { mode: "STANDARD" },
-        ),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -198,6 +204,26 @@ export default function GerarPage() {
             </div>
           )}
 
+          {/* Nome opcional do currículo (ADR-0021). Vazio → default no servidor. */}
+          <div className="gen-block">
+            <div className="field">
+              <label className="label" htmlFor="resumeName">
+                Nome do currículo <span className="muted">(opcional)</span>
+              </label>
+              <input
+                id="resumeName"
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={generating}
+                placeholder="Ex.: Currículo para vaga de Backend — Acme"
+              />
+              <span className="help">
+                Se deixar em branco, usamos um nome padrão com o modo e a data.
+              </span>
+            </div>
+          </div>
+
           {/* Ações. */}
           <div className="gen-actions">
             {generating ? (
@@ -245,7 +271,7 @@ export default function GerarPage() {
             <section className="preview" aria-labelledby="preview-heading">
               <div className="preview-head">
                 <h2 id="preview-heading">
-                  <Icon name="file" /> {resumeModeLabel(resume.mode)} (.tex)
+                  <Icon name="file" /> {resume.name} (.tex)
                 </h2>
                 <div className="preview-actions">
                   <button type="button" className="btn btn-secondary" onClick={handleCopy}>
@@ -262,8 +288,20 @@ export default function GerarPage() {
                   <a className="btn btn-primary" href={`/api/resumes/${resume.id}/download`} download>
                     <Icon name="download" /> Baixar .tex
                   </a>
+                  <a
+                    className="btn btn-secondary"
+                    href={OVERLEAF_PROJECT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Icon name="ext" /> {OVERLEAF_BUTTON_LABEL}
+                  </a>
                 </div>
               </div>
+              <p className="gen-mode-hint" style={{ marginTop: 8 }}>
+                Copie o <span className="mono">.tex</span> e cole no projeto do Overleaf para compilar
+                o PDF.
+              </p>
 
               {/* Avisos de rastreabilidade — em qualquer modo, só warnings (errors nunca). */}
               {visibleWarnings(resume.traceabilityReport).length > 0 && (

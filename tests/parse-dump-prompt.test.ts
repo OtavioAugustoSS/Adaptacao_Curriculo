@@ -54,6 +54,18 @@ describe("PARSE_DUMP_SYSTEM_PROMPT — formato da saída (ProfileBundle sem ids)
   });
 });
 
+describe("PARSE_DUMP_SYSTEM_PROMPT — completude (ADR-0020: capturar tudo)", () => {
+  it("deve reforçar a captura completa (não resumir nem omitir itens reais)", () => {
+    // O import também precisa ser COMPLETO: capturar TODAS as listas que o texto traz,
+    // incluindo bullets/techStack dos projetos e idiomas/cursos.
+    expect(PARSE_DUMP_SYSTEM_PROMPT).toContain("CAPTURE TUDO");
+    expect(PARSE_DUMP_SYSTEM_PROMPT).toMatch(/TODAS as experiências/);
+    expect(PARSE_DUMP_SYSTEM_PROMPT).toContain("techStack");
+    expect(PARSE_DUMP_SYSTEM_PROMPT).toMatch(/idiomas/);
+    expect(PARSE_DUMP_SYSTEM_PROMPT).toMatch(/cursos\/certificações/);
+  });
+});
+
 describe("PARSE_DUMP_SYSTEM_PROMPT — regra de current (US-12) e idioma", () => {
   it("deve instruir current: true apenas quando o item está EM ANDAMENTO", () => {
     expect(PARSE_DUMP_SYSTEM_PROMPT).toContain("EM ANDAMENTO");

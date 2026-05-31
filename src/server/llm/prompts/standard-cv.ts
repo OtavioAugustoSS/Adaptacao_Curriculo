@@ -24,11 +24,13 @@ REGRA INEGOCIÁVEL — NÃO INVENTE NADA:
 - Você NÃO PODE: adicionar fatos novos, inflar números, inventar resultados ou alterar empresas/cargos/instituições/datas.
 - Na dúvida, prefira omitir a inventar.
 
-TAREFA:
-- Monte um currículo "padrão" (geral, não voltado a uma vaga específica) cobrindo o perfil do usuário de forma completa e bem ordenada.
+TAREFA — CURRÍCULO COMPLETO (não omita nada da base):
+- Monte um currículo "padrão" (geral, não voltado a uma vaga específica) que inclua TUDO o que existe na base, bem ordenado. Este é o currículo completo do usuário: NÃO corte itens, NÃO resuma a ponto de perder informação. Você organiza e reescreve a redação; não decide o que fica de fora.
+- Inclua TODAS as experiências, TODAS as formações, TODOS os projetos (com TODOS os seus bullets e TODO o seu techStack), TODAS as habilidades, TODOS os idiomas e TODOS os cursos/certificações da base.
 - Escreva o "objective" como um resumo profissional curto baseado SOMENTE no resumo/itens reais da base (sem fatos novos). Se a base não tiver resumo, derive um resumo neutro a partir dos cargos/formações reais.
-- Para cada experiência selecionada, copie "sourceId", "role", "company" e o período EXATAMENTE como na base (apenas formate o período de forma legível). Reescreva apenas os bullets, sem inventar conquistas.
-- Agrupe habilidades por categoria conforme a base. Selecione projetos e formações reais.
+- Para cada experiência, copie "sourceId", "role", "company" e o período EXATAMENTE como na base (apenas formate o período de forma legível). Reescreva apenas os bullets, sem inventar conquistas, sem omitir realizações reais.
+- Para cada projeto, copie "sourceId", "title" e o "url" da base; reescreva a "description"; e PRESERVE os "bullets" e o "techStack" reais da base (reescreva a redação dos bullets se quiser, mas não invente nem descarte). O "techStack" deve listar só tecnologias que estão na base do projeto.
+- Agrupe habilidades por categoria conforme a base, incluindo todas. Inclua todos os idiomas (nome + proficiência reais) e todos os cursos/certificações (título, emissor, data e url reais) da base.
 - Para cada formação, monte o "period" a partir das datas reais da base (ex.: "2017 – 2021"). Quando a formação tiver "current": true, formate o "period" terminando em "– Atual" (ex.: "2022 – Atual"); não invente datas (espelha o tratamento do período de experiência).
 
 FORMATO DA SAÍDA — responda ESTRITAMENTE com um único objeto JSON (sem markdown, sem comentários, sem texto fora do JSON) neste formato:
@@ -37,12 +39,14 @@ FORMATO DA SAÍDA — responda ESTRITAMENTE com um único objeto JSON (sem markd
   "education": [ { "sourceId"?: string, "institution": string, "degree": string, "field"?: string, "period"?: string, "details"?: string } ],
   "skills": [ { "category": string, "items": string[] } ],
   "experience": [ { "sourceId": string, "role": string, "company": string, "location"?: string, "period": string, "bullets": string[] } ],
-  "projects": [ { "sourceId"?: string, "title": string, "description": string, "url"?: string } ],
+  "projects": [ { "sourceId"?: string, "title": string, "description": string, "url"?: string, "bullets"?: string[], "techStack"?: string[] } ],
+  "languages": [ { "sourceId"?: string, "name": string, "proficiency": string } ],
+  "courses": [ { "sourceId"?: string, "title": string, "issuer": string, "date": string, "url"?: string } ],
   "extras"?: string[],
   "leadership"?: string[]
 }
 
-Em "experience", "sourceId" é OBRIGATÓRIO e deve ser o id do item correspondente na base (campo "id"). Em "education"/"projects", inclua "sourceId" com o id real sempre que possível. Não inclua campos fora deste formato.`;
+Em "experience", "sourceId" é OBRIGATÓRIO e deve ser o id do item correspondente na base (campo "id"). Em "education"/"projects"/"languages"/"courses", inclua "sourceId" com o id real sempre que possível. Em "projects", "bullets" e "techStack" devem refletir os do item real da base. Não inclua campos fora deste formato.`;
 
 /**
  * Monta o user prompt: a base de dados serializada como JSON + a instrução final.

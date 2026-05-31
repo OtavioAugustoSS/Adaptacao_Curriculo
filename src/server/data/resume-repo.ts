@@ -15,6 +15,7 @@ import {
   type ResumeContent,
   type TraceabilityReport,
 } from "@/lib/schemas";
+import { defaultResumeName } from "@/lib/presentation/resume-meta";
 
 /** Dados necessários para persistir um currículo gerado (entrada da escrita). */
 export interface NewGeneratedResume {
@@ -22,6 +23,11 @@ export interface NewGeneratedResume {
   modelId: string;
   content: ResumeContent;
   texOutput: string;
+  /**
+   * Nome do usuário (ADR-0021). Ausente/vazio → default = rótulo do modo + data
+   * (`defaultResumeName`), o mesmo aplicado no backfill da migração.
+   */
+  name?: string;
   /** Id da vaga (Modo 2). `null`/ausente no Modo 1. */
   jobPostingId?: string | null;
   /**
@@ -39,6 +45,7 @@ export interface NewGeneratedResume {
 interface GeneratedResumeRow {
   id: string;
   userId: string;
+  name: string;
   mode: string;
   jobPostingId: string | null;
   modelId: string;
@@ -56,6 +63,7 @@ function toGeneratedResume(row: GeneratedResumeRow): GeneratedResume {
   return GeneratedResumeSchema.parse({
     id: row.id,
     userId: row.userId,
+    name: row.name,
     mode: row.mode,
     jobPostingId: row.jobPostingId,
     modelId: row.modelId,
@@ -81,9 +89,17 @@ export async function createGeneratedResume(
 ): Promise<GeneratedResume> {
   const userId = getCurrentUserId();
 
+  // Default do nome (ADR-0021): rótulo do modo + data de hoje (a coluna `createdAt`
+  // também usa now(), então casam na data). Nome vazio/ausente → default no servidor.
+  const name =
+    input.name && input.name.trim().length > 0
+      ? input.name.trim()
+      : defaultResumeName(input.mode, new Date());
+
   const row = await prisma.generatedResume.create({
     data: {
       userId,
+      name,
       mode: input.mode,
       jobPostingId: input.jobPostingId ?? null,
       modelId: input.modelId,
@@ -97,6 +113,41 @@ export async function createGeneratedResume(
   });
 
   return toGeneratedResume(row);
+}
+
+/**
+ * Renomeia um currículo do usuário atual (ADR-0021 — PATCH /api/resumes/[id]).
+ * Restrito ao usuário (updateMany com `where: { id, userId }`): id inexistente OU
+ * alheio → 0 linhas afetadas → devolve `null` (o handler responde 404, sem vazar a
+ * existência de recurso alheio). Devolve o registro atualizado no sucesso.
+ */
+export async function renameGeneratedResume(
+  id: string,
+  name: string,
+): Promise<GeneratedResume | null> {
+  const userId = getCurrentUserId();
+
+  const result = await prisma.generatedResume.updateMany({
+    where: { id, userId },
+    data: { name },
+  });
+  if (result.count === 0) return null;
+
+  return getGeneratedResumeById(id);
+}
+
+/**
+ * Exclui um currículo do usuário atual (ADR-0021 — DELETE /api/resumes/[id]).
+ * Restrito ao usuário (deleteMany com `where: { id, userId }`): devolve `true` se algo
+ * foi apagado, `false` se id inexistente/alheio (o handler responde 404).
+ */
+export async function deleteGeneratedResume(id: string): Promise<boolean> {
+  const userId = getCurrentUserId();
+
+  const result = await prisma.generatedResume.deleteMany({
+    where: { id, userId },
+  });
+  return result.count > 0;
 }
 
 // ---------------------------------------------------------------------------

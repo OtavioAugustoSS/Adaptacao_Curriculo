@@ -26,10 +26,12 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0013](0013-modelo-padrao-llama-3-3-70b.md) | Modelo padrão do MVP: `meta/llama-3.3-70b-instruct` | Accepted |
 | [0014](0014-geracao-modo1-prereq-traceability-nome-arquivo.md) | Geração Modo 1: pré-requisito da base, `traceabilityReport` pré-US-07, nome do `.tex` | Accepted |
 | [0015](0015-guardrail-rastreabilidade-classificacao-regeneracao.md) | Guardrail de rastreabilidade (US-07): classificação erro×aviso e regeneração | Accepted |
-| [0016](0016-modo2-historico-escopo-mvp.md) | Modo 2 (US-08) e histórico (US-09): decisões de escopo do MVP | Accepted |
+| [0016](0016-modo2-historico-escopo-mvp.md) | Modo 2 (US-08) e histórico (US-09): decisões de escopo do MVP | Accepted (parte do título do histórico Superseded by ADR-0021) |
 | [0017](0017-tailwind-css-mapeamento-tokens-fatia-4.md) | Tailwind CSS na Fatia 4: setup no Next 15 + mapeamento dos tokens do DS | Accepted |
 | [0018](0018-import-perfil-dump-education-current.md) | Fatia 5: import de perfil por dump + `Education.current` | Accepted |
 | [0019](0019-import-perfil-por-arquivo.md) | Fatia 6: importar currículo por arquivo (PDF/DOCX/TXT) | Accepted |
+| [0020](0020-resume-content-enriquecido-geracao-completa.md) | Fatia 7: `ResumeContent` enriquecido (idiomas, cursos, bullets+stack de projeto); geração completa e fiel | Accepted |
+| [0021](0021-gestao-curriculos-nome-editar-excluir-limpar-base.md) | Fatia 7: gestão de currículos (nome/editar/excluir) e limpar a base | Accepted |
 
 ## Template padrão de ADR
 

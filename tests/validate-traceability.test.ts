@@ -71,7 +71,17 @@ function makeContent(overrides: Partial<ResumeContent> = {}): ResumeContent {
         bullets: ["Reduziu latência em 30% no checkout"],
       },
     ],
-    projects: [{ sourceId: "prj-1", title: "Compilador", description: "Compilador" }],
+    projects: [
+      {
+        sourceId: "prj-1",
+        title: "Compilador",
+        description: "Compilador",
+        bullets: [],
+        techStack: [],
+      },
+    ],
+    languages: [],
+    courses: [],
     ...overrides,
   };
 }
@@ -186,7 +196,7 @@ describe("validateTraceability — erros fortes de formação e projeto", () => 
 
   it("deve acusar erro quando o projeto não casa com nenhum projeto da base", () => {
     const content = makeContent({
-      projects: [{ title: "Projeto Fantasma", description: "x" }],
+      projects: [{ title: "Projeto Fantasma", description: "x", bullets: [], techStack: [] }],
     });
     const report = validateTraceability(content, makeBundle());
     expect(report.errors.some((e) => e.field === "projects[0].title")).toBe(true);
@@ -196,7 +206,15 @@ describe("validateTraceability — erros fortes de formação e projeto", () => 
     // sourceId real (prj-1 = Compilador) mas title trocado -> erro. Simétrico ao
     // rename de formação: id verdadeiro, entidade renomeada.
     const content = makeContent({
-      projects: [{ sourceId: "prj-1", title: "Sistema Bancário", description: "x" }],
+      projects: [
+        {
+          sourceId: "prj-1",
+          title: "Sistema Bancário",
+          description: "x",
+          bullets: [],
+          techStack: [],
+        },
+      ],
     });
     const report = validateTraceability(content, makeBundle());
     expect(report.errors.some((e) => e.field === "projects[0].title")).toBe(true);
@@ -263,7 +281,7 @@ describe("validateTraceability — agregação de múltiplos erros", () => {
         },
       ],
       education: [{ institution: "Universidade Fantasma", degree: "PhD" }],
-      projects: [{ title: "Projeto Fantasma", description: "x" }],
+      projects: [{ title: "Projeto Fantasma", description: "x", bullets: [], techStack: [] }],
     });
     const report = validateTraceability(content, makeBundle());
 
@@ -303,5 +321,180 @@ describe("validateTraceability — erro e aviso convivem", () => {
     const report = validateTraceability(content, makeBundle());
     expect(report.errors.length).toBeGreaterThan(0);
     expect(report.warnings.some((w) => w.value === "99%")).toBe(true);
+  });
+});
+
+// --- Fatia 7 / ADR-0020 §3: número em bullet de projeto, techStack, idiomas, cursos ---
+
+describe("validateTraceability — número em bullet de PROJETO (ADR-0020 §3)", () => {
+  it("deve avisar quando um número de bullet de projeto não está na base", () => {
+    // O bullet do projeto não pode ser zona cega: número novo vira aviso (não erro),
+    // com o MESMO critério dos bullets de experiência.
+    const content = makeContent({
+      projects: [
+        {
+          sourceId: "prj-1",
+          title: "Compilador",
+          description: "Compilador",
+          bullets: ["Reduziu o tempo de build em 42%"],
+          techStack: [],
+        },
+      ],
+    });
+    const report = validateTraceability(content, makeBundle());
+    expect(report.errors).toEqual([]);
+    expect(
+      report.warnings.some(
+        (w) => w.field.startsWith("projects[0].bullets") && w.value === "42%",
+      ),
+    ).toBe(true);
+  });
+
+  it("NÃO deve avisar de número de bullet de projeto que existe na base", () => {
+    // A base tem o projeto com um bullet "30%" — espelhamos esse número na saída.
+    const bundle = makeBundle({
+      projects: [
+        {
+          id: "prj-1",
+          name: "Compilador",
+          description: "Um compilador de brinquedo",
+          bullets: ["Reduziu o tempo de build em 30%"],
+          techStack: ["Rust"],
+          order: 0,
+        },
+      ],
+    });
+    const content = makeContent({
+      projects: [
+        {
+          sourceId: "prj-1",
+          title: "Compilador",
+          description: "Compilador",
+          bullets: ["Reduziu o tempo de build em 30%"],
+          techStack: [],
+        },
+      ],
+    });
+    const report = validateTraceability(content, bundle);
+    expect(report.warnings.filter((w) => w.value === "30%")).toEqual([]);
+  });
+});
+
+describe("validateTraceability — techStack de projeto (ADR-0020 §3)", () => {
+  it("NÃO deve avisar de techStack que está na base (Rust real)", () => {
+    // O projeto prj-1 da base tem techStack ["Rust"].
+    const content = makeContent({
+      projects: [
+        {
+          sourceId: "prj-1",
+          title: "Compilador",
+          description: "Compilador",
+          bullets: [],
+          techStack: ["Rust"],
+        },
+      ],
+    });
+    const report = validateTraceability(content, makeBundle());
+    expect(report.warnings.filter((w) => w.value === "Rust")).toEqual([]);
+  });
+
+  it("deve avisar (não erro) de techStack fora da base", () => {
+    const content = makeContent({
+      projects: [
+        {
+          sourceId: "prj-1",
+          title: "Compilador",
+          description: "Compilador",
+          bullets: [],
+          techStack: ["Haskell"],
+        },
+      ],
+    });
+    const report = validateTraceability(content, makeBundle());
+    expect(report.errors).toEqual([]);
+    expect(
+      report.warnings.some(
+        (w) => w.field.startsWith("projects[0].techStack") && w.value === "Haskell",
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("validateTraceability — idiomas (ADR-0020 §3: AVISO, nunca erro forte)", () => {
+  const bundleComIdioma = () =>
+    makeBundle({
+      languages: [{ name: "Inglês", proficiency: "Avançado", order: 0 }],
+    });
+
+  it("NÃO deve avisar de idioma presente na base (casa por nome normalizado)", () => {
+    const content = makeContent({
+      languages: [{ name: "inglês", proficiency: "Fluente" }],
+    });
+    const report = validateTraceability(content, bundleComIdioma());
+    // proficiency é redação (não rastreada); o nome casa por normalização -> sem aviso.
+    expect(report.warnings.filter((w) => w.field.startsWith("languages"))).toEqual([]);
+  });
+
+  it("deve AVISAR (não erro) de idioma fora da base", () => {
+    const content = makeContent({
+      languages: [{ name: "Mandarim", proficiency: "Básico" }],
+    });
+    const report = validateTraceability(content, bundleComIdioma());
+    expect(report.errors).toEqual([]);
+    expect(
+      report.warnings.some((w) => w.field === "languages[0].name" && w.value === "Mandarim"),
+    ).toBe(true);
+  });
+});
+
+describe("validateTraceability — cursos (ADR-0020 §3: AVISO, nunca erro forte)", () => {
+  const bundleComCurso = () =>
+    makeBundle({
+      courses: [
+        { title: "AWS Certified", issuer: "Amazon", date: "2023", order: 0 },
+      ],
+    });
+
+  it("NÃO deve avisar de curso presente na base (casa por título normalizado)", () => {
+    const content = makeContent({
+      courses: [{ title: "aws certified", issuer: "AWS", date: "2024" }],
+    });
+    const report = validateTraceability(content, bundleComCurso());
+    // issuer/date não são rastreados; o título casa por normalização -> sem aviso.
+    expect(report.warnings.filter((w) => w.field.startsWith("courses"))).toEqual([]);
+  });
+
+  it("deve AVISAR (não erro) de curso fora da base", () => {
+    const content = makeContent({
+      courses: [{ title: "Curso Inventado", issuer: "X", date: "2025" }],
+    });
+    const report = validateTraceability(content, bundleComCurso());
+    expect(report.errors).toEqual([]);
+    expect(
+      report.warnings.some(
+        (w) => w.field === "courses[0].title" && w.value === "Curso Inventado",
+      ),
+    ).toBe(true);
+  });
+
+  it("NÃO deve introduzir nenhum erro forte novo por idioma/curso/techStack/bullet de projeto", () => {
+    // Saída com idioma, curso, techStack e número TODOS fora da base: deve gerar só
+    // AVISOS — os erros fortes (experiência/formação/projeto) seguem a regra antiga.
+    const content = makeContent({
+      projects: [
+        {
+          sourceId: "prj-1",
+          title: "Compilador",
+          description: "Compilador",
+          bullets: ["Subiu 5x a performance"],
+          techStack: ["Haskell"],
+        },
+      ],
+      languages: [{ name: "Klingon", proficiency: "Nativo" }],
+      courses: [{ title: "Curso X", issuer: "Y", date: "2025" }],
+    });
+    const report = validateTraceability(content, makeBundle());
+    expect(report.errors).toEqual([]);
+    expect(report.warnings.length).toBeGreaterThan(0);
   });
 });

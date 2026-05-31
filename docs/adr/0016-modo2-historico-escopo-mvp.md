@@ -1,6 +1,6 @@
 # 0016 — Modo 2 (US-08) e histórico (US-09): decisões de escopo do MVP
 
-- **Status:** Accepted
+- **Status:** Accepted (a decisão "título do histórico = rótulo do modo" e "sem exclusão" são Superseded by ADR-0021)
 - **Data:** 2026-05-30
 
 ## Contexto

@@ -19,15 +19,21 @@ import {
 } from "../../../templates/faangpath/skeleton";
 import { escapeLatex } from "./escape-latex";
 
-// Títulos das seções faangpath (ver docs/api-contract.md §3 e resume.cls.txt).
+// Títulos das seções em PT-BR (Fatia 7 / ADR-0020). O produto é PT-BR; os títulos
+// antes saíam em inglês (hardcoded). Ver docs/api-contract.md §3 e resume.cls.txt.
 const SECTION_TITLES = {
-  objective: "OBJECTIVE",
-  education: "Education",
-  skills: "SKILLS",
-  experience: "EXPERIENCE",
-  projects: "PROJECTS",
-  extras: "Extra-Curricular Activities",
-  leadership: "Leadership",
+  objective: "OBJETIVO",
+  education: "FORMAÇÃO",
+  skills: "HABILIDADES",
+  experience: "EXPERIÊNCIA",
+  projects: "PROJETOS",
+  languages: "IDIOMAS",
+  // "E" (não "&"): os títulos são constantes interpoladas direto em \begin{rSection}{…}
+  // e NÃO passam por escapeLatex (só o body passa). Um "&" cru quebraria a compilação no
+  // Overleaf (caractere especial); títulos hardcoded usam só letras/espaço/acentos.
+  courses: "CURSOS E CERTIFICAÇÕES",
+  extras: "ATIVIDADES EXTRACURRICULARES",
+  leadership: "LIDERANÇA",
 } as const;
 
 /**
@@ -151,23 +157,89 @@ function renderExperience(items: ResumeContent["experience"]): string | null {
 }
 
 /**
- * Seção PROJECTS: um bloco por projeto.
- * Formato faangpath: título em negrito + descrição; URL clicável quando houver.
+ * Seção PROJETOS: um bloco por projeto.
+ * Formato faangpath: título em negrito + descrição; URL clicável quando houver;
+ * abaixo, os `bullets` em itemize e uma linha "Stack: …" com o `techStack` (Fatia 7 /
+ * ADR-0020). Bullets/stack vazios são omitidos sem deixar comandos LaTeX órfãos.
  */
 function renderProjects(items: ResumeContent["projects"]): string | null {
   if (items.length === 0) return null;
 
   const blocks = items.map((proj) => {
     const title = `\\textbf{${escapeLatex(proj.title)}}`;
-    let line = `${title} ${escapeLatex(proj.description)}`;
+    let head = `${title} ${escapeLatex(proj.description)}`;
     if (proj.url) {
       const url = escapeLatex(proj.url);
-      line += ` \\href{${url}}{${url}}`;
+      head += ` \\href{${url}}{${url}}`;
     }
-    return line;
+
+    const lines = [head];
+
+    // bullets/techStack têm default [] no schema; o `?? []` protege quem passar um
+    // ResumeContent não-parseado (campos ausentes não devem quebrar o renderer puro).
+    const bullets = (proj.bullets ?? []).filter((b) => b.trim().length > 0);
+    if (bullets.length > 0) {
+      lines.push(itemize(bullets.map((b) => escapeLatex(b))));
+    }
+
+    const stack = (proj.techStack ?? []).filter((t) => t.trim().length > 0);
+    if (stack.length > 0) {
+      const joined = stack.map((t) => escapeLatex(t)).join(", ");
+      lines.push(`\\textbf{Stack:} ${joined}`);
+    }
+
+    return lines.join("\n");
   });
 
   return rSection(SECTION_TITLES.projects, blocks.join("\n\n"));
+}
+
+/**
+ * Seção IDIOMAS: uma linha "Idioma — Proficiência" por idioma, separadas por " · ".
+ * Ex.: "Português — Nativo · Inglês — Avançado". Omite a seção se não houver idiomas.
+ */
+function renderLanguages(items: ResumeContent["languages"]): string | null {
+  // `?? []`: o campo tem default [] no schema, mas o renderer é puro e pode receber um
+  // ResumeContent não-parseado (campo ausente) — não deve quebrar nem emitir seção.
+  const list = items ?? [];
+  if (list.length === 0) return null;
+
+  const parts = list
+    .filter((l) => l.name.trim().length > 0)
+    .map((l) => `${escapeLatex(l.name)} — ${escapeLatex(l.proficiency)}`);
+
+  if (parts.length === 0) return null;
+  return rSection(SECTION_TITLES.languages, parts.join(" $\\cdot$ "));
+}
+
+/**
+ * Seção CURSOS & CERTIFICAÇÕES: um bloco por curso.
+ * Formato: título em negrito · emissor · data; URL clicável quando houver. Omite a
+ * seção se não houver cursos.
+ */
+function renderCourses(items: ResumeContent["courses"]): string | null {
+  // `?? []`: idem renderLanguages — robusto a ResumeContent não-parseado.
+  const list = items ?? [];
+  if (list.length === 0) return null;
+
+  const blocks = list
+    .filter((c) => c.title.trim().length > 0)
+    .map((c) => {
+      const title = `\\textbf{${escapeLatex(c.title)}}`;
+      const meta = [c.issuer, c.date]
+        .filter((s) => s.trim().length > 0)
+        .map((s) => escapeLatex(s))
+        .join(" $\\cdot$ ");
+      let line = meta ? `${title} $\\cdot$ ${meta}` : title;
+      if (c.url) {
+        const url = escapeLatex(c.url);
+        line += ` \\href{${url}}{${url}}`;
+      }
+      return line;
+    });
+
+  if (blocks.length === 0) return null;
+  return rSection(SECTION_TITLES.courses, blocks.join("\\\\\n"));
 }
 
 /** Seção de lista simples (Extra-Curricular / Leadership): itemize de strings. */
@@ -199,6 +271,8 @@ export function renderResume(content: ResumeContent, header: Profile): string {
     renderSkills(content.skills),
     renderExperience(content.experience),
     renderProjects(content.projects),
+    renderLanguages(content.languages),
+    renderCourses(content.courses),
     renderBulletList(SECTION_TITLES.extras, content.extras),
     renderBulletList(SECTION_TITLES.leadership, content.leadership),
   ].filter((s): s is string => s !== null);

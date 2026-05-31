@@ -4,7 +4,22 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-30 — **Fatia 6 (ADR-0019)** — nova rota
+> Última alteração: 2026-05-30 — **Fatia 7 (ADR-0020/ADR-0021)** — mudanças **aditivas**.
+> **ADR-0020:** o `ResumeContentSchema` ganha `languages` (`{ name, proficiency, sourceId? }[]`) e
+> `courses` (`{ title, issuer, date, url?, sourceId? }[]`); o item de projeto ganha `bullets: string[]`
+> e `techStack: string[]`. Modo 1 passa a ser **completo** (inclui tudo da base, não omite); Modo 2
+> segue selecionando para a vaga. O guardrail (`validate-traceability.ts`) é **estendido sem
+> afrouxar** o invariante: `checkNumbers` passa a varrer também os **bullets de projeto**;
+> `project.techStack`, `languages[].name` e `courses[].title` viram **avisos** quando fora da base
+> (idioma/curso por nome/título normalizado — **aviso, não erro forte**). Nenhum erro forte novo.
+> **ADR-0021:** `GeneratedResume` ganha **`name` (string, editável)** — supersede a parte do ADR-0016
+> que fixava "título do histórico = rótulo do modo" (default = rótulo do modo + data; **não** é o
+> texto da vaga, invariante intacto); `GenerateRequestSchema` ganha **`name?: string`**. Três rotas
+> novas: **`PATCH /api/resumes/[id]`** (renomeia), **`DELETE /api/resumes/[id]`** (exclui),
+> **`DELETE /api/profile`** (limpa a base — apaga o `Profile`; cascade nas 6 listas). Invariante
+> anti-alucinação e guardrail core **inalterados**.
+>
+> 2026-05-30 — **Fatia 6 (ADR-0019)** — nova rota
 > **`POST /api/profile/import/file`** (`multipart/form-data`, campo `file`); response
 > **`ProfileBundleSchema`** (mesmo rascunho **tolerante** da Fatia 5, **NÃO persistido**;
 > reusa `ImportProfileBundleSchema` — **sem mudança de schema**). Extração de texto **no
@@ -50,12 +65,16 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 - `JobPostingSchema` — `{ rawText, title?, company? }`.
 - `ProfileImportRequestSchema` — `{ rawText: string }` (`min 1`); request do import por dump
   (ADR-0018). A resposta reusa `ProfileBundleSchema` (rascunho não persistido).
-- `ResumeContentSchema` — **saída estruturada do LLM** (ver §3).
-- `GenerateRequestSchema` — `{ mode: "STANDARD" | "JOB_ADAPTIVE", jobText?: string }`
-  (`jobText` obrigatório quando `mode === "JOB_ADAPTIVE"`).
+- `ResumeContentSchema` — **saída estruturada do LLM** (ver §3). **Fatia 7 (ADR-0020):** ganha
+  `languages` (`{ name, proficiency, sourceId? }[]`) e `courses` (`{ title, issuer, date, url?,
+  sourceId? }[]`); o item de projeto ganha `bullets: string[]` e `techStack: string[]`.
+- `GenerateRequestSchema` — `{ mode: "STANDARD" | "JOB_ADAPTIVE", jobText?: string, name?: string }`
+  (`jobText` obrigatório quando `mode === "JOB_ADAPTIVE"`; `name?` é o nome do currículo — ADR-0021,
+  default no servidor = rótulo do modo + data).
 - `TraceabilityReportSchema` — `{ errors: Issue[], warnings: Issue[] }`, onde
   `Issue = { field, value, reason }`.
-- `GeneratedResumeSchema` — registro persistido (ver ERD).
+- `GeneratedResumeSchema` — registro persistido (ver ERD). **Fatia 7 (ADR-0021):** ganha
+  `name: string` (editável; default = rótulo do modo + data).
 
 ## 2. Route Handlers
 
@@ -65,9 +84,12 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 | PUT | `/api/profile` | `ProfileBundleSchema` | `ProfileBundleSchema` | Cria/atualiza a base completa (upsert). |
 | POST | `/api/profile/import` | `ProfileImportRequestSchema` (`{ rawText }`) | `ProfileBundleSchema` | Estrutura um dump de texto livre em um **rascunho** da base (LLM extrai, **não persiste**) para o usuário revisar. Variante tolerante no adapter (`fullName` pode vir vazio); `502` em `LLMError`. ADR-0018. |
 | POST | `/api/profile/import/file` | `multipart/form-data` (campo `file`) | `ProfileBundleSchema` | Extrai o texto de um arquivo (PDF/DOCX/TXT) **no servidor** e reusa o **mesmo** pipeline da `/import` → rascunho tolerante **não persistido**. Sem schema Zod (corpo binário): whitelist de tipo + limite de tamanho. `400` (sem arquivo), `415` (tipo), `413` (tamanho), `422` (texto vazio — PDF imagem, sem OCR), `502` (`LLMError`). ADR-0019. |
-| POST | `/api/resumes/generate` | `GenerateRequestSchema` | `GeneratedResumeSchema` | Gera currículo (Modo 1 ou 2): LLM → render → guardrail → persiste. |
-| GET | `/api/resumes` | — | `GeneratedResumeSchema[]` | Lista o histórico de currículos gerados. |
+| POST | `/api/resumes/generate` | `GenerateRequestSchema` | `GeneratedResumeSchema` | Gera currículo (Modo 1 ou 2): LLM → render → guardrail → persiste. `name?` opcional (default servidor). |
+| GET | `/api/resumes` | — | `GeneratedResumeSchema[]` | Lista o histórico de currículos gerados (inclui `name`). |
+| PATCH | `/api/resumes/[id]` | `{ name: string }` | `GeneratedResumeSchema` | Renomeia o currículo do usuário. **200**; **400** (Zod, `name` vazio); **404** (id inexistente/alheio). ADR-0021. |
+| DELETE | `/api/resumes/[id]` | — | — (**204** sem corpo) | Exclui o currículo do usuário. **404** (id inexistente/alheio). ADR-0021. |
 | GET | `/api/resumes/[id]/download` | — | `text/plain` (`.tex`) | Baixa o `.tex` cacheado (`Content-Disposition: attachment`). |
+| DELETE | `/api/profile` | — | — (**204** sem corpo) | Limpa a base: apaga o `Profile` (cascade nas 6 listas); `getProfileBundle` volta a `emptyBundle()`. Idempotente. ADR-0021. |
 
 **Convenções:**
 - Todo handler resolve o usuário via `getCurrentUserId()` — sem `userId` no request.
@@ -87,17 +109,24 @@ ResumeContent = {
   education:   EducationItem[],       // selecionados/ordenados da base
   skills:      { category, items: string[] }[],
   experience:  { sourceId, role, company, location?, period, bullets: string[] }[],
-  projects:    { sourceId?, title, description, url? }[],
+  projects:    { sourceId?, title, description, url?, bullets: string[], techStack: string[] }[],
+  languages:   { name, proficiency, sourceId? }[],        // ADR-0020
+  courses:     { title, issuer, date, url?, sourceId? }[], // ADR-0020
   extras?:     string[],              // extra-curricular
   leadership?: string[],
 }
 ```
 
 - Cada item de `experience`/`projects` traz `sourceId` apontando para o item real da base
-  → o renderer e o guardrail conseguem rastrear.
+  → o renderer e o guardrail conseguem rastrear. `languages`/`courses` têm `sourceId` opcional.
+- **Fatia 7 (ADR-0020):** `projects[]` ganha `bullets`/`techStack`; há novas seções `languages` e
+  `courses`. Guardrail: `checkNumbers` varre também `projects[].bullets[]`; `techStack`,
+  `languages[].name` e `courses[].title` fora da base viram **avisos** (não erro forte). Modo 1
+  passa a incluir **tudo** da base; Modo 2 segue selecionando para a vaga.
 - O renderer (`render-latex.ts`) mapeia esse objeto nas seções do template faangpath
-  (`OBJECTIVE`, `Education`, `SKILLS`, `EXPERIENCE`, `PROJECTS`, `Extra-Curricular`,
-  `Leadership`), aplicando `escapeLatex()` em todo texto.
+  (`OBJECTIVE`, `Education`, `SKILLS`, `EXPERIENCE`, `PROJECTS`, **`LANGUAGES`**, **`COURSES`**,
+  `Extra-Curricular`, `Leadership`), aplicando `escapeLatex()` em todo texto. (Os rótulos em PT-BR
+  e a cor do link são detalhes do renderer/preâmbulo — Workstream 1, fora do contrato.)
 
 > **Nota (2026-05-29) — cabeçalho separado do `ResumeContent`.** O `ResumeContentSchema`
 > NÃO contém bloco de cabeçalho (nome/contato). O cabeçalho do `.tex` (`\name{...}` e

@@ -20,6 +20,8 @@ function makeContent(overrides: Partial<ResumeContent> = {}): ResumeContent {
     skills: [],
     experience: [],
     projects: [],
+    languages: [],
+    courses: [],
     ...overrides,
   };
 }

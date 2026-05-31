@@ -1,6 +1,7 @@
 // Rotas da base de dados pessoal (contrato §2):
-//   GET  /api/profile -> ProfileBundleSchema  (lê a base completa do usuário atual)
-//   PUT  /api/profile <- ProfileBundleSchema -> ProfileBundleSchema  (upsert)
+//   GET    /api/profile -> ProfileBundleSchema  (lê a base completa do usuário atual)
+//   PUT    /api/profile <- ProfileBundleSchema -> ProfileBundleSchema  (upsert)
+//   DELETE /api/profile -> 204  (limpa a base — ADR-0021; idempotente, cascade)
 //
 // Identidade via getCurrentUserId() no repositório — sem userId no request.
 // Nesta US (US-02) o PUT persiste o cabeçalho/Profile; as listas da base entram
@@ -8,7 +9,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { ProfileBundleSchema } from "@/lib/schemas";
-import { getProfileBundle, saveProfileBundle } from "@/server/data/profile-repo";
+import { getProfileBundle, saveProfileBundle, clearProfile } from "@/server/data/profile-repo";
 import { errorResponse, validationErrorResponse } from "@/lib/http";
 
 export async function GET() {
@@ -46,6 +47,23 @@ export async function PUT(req: NextRequest) {
       500,
       "INTERNAL_ERROR",
       "Falha ao salvar a base de dados.",
+      process.env.NODE_ENV !== "production" ? String(err) : undefined,
+    );
+  }
+}
+
+// DELETE /api/profile — limpa a base do usuário atual (ADR-0021). Apaga o Profile; o
+// cascade derruba as 6 listas. Idempotente (sem Profile → ainda 204). O histórico de
+// currículos sobrevive (referencia o User, não o Profile).
+export async function DELETE() {
+  try {
+    await clearProfile();
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    return errorResponse(
+      500,
+      "INTERNAL_ERROR",
+      "Falha ao limpar a base de dados.",
       process.env.NODE_ENV !== "production" ? String(err) : undefined,
     );
   }

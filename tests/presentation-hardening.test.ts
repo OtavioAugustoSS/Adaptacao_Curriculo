@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   resumeModeLabel,
   resumeModeBadge,
+  defaultResumeName,
   visibleWarnings,
   warningCount,
   formatResumeDate,
@@ -46,6 +47,34 @@ describe("resumeModeBadge — badge curto por modo", () => {
   it("deve mapear cada modo ao seu badge curto e nada além disso", () => {
     expect(resumeModeBadge("STANDARD")).toBe("Padrão");
     expect(resumeModeBadge("JOB_ADAPTIVE")).toBe("Adaptado");
+  });
+});
+
+// --- ADR-0021: nome DEFAULT do currículo (rótulo do modo + data dd/mm/aaaa) ---
+
+describe("defaultResumeName — nome padrão por modo + data (ADR-0021)", () => {
+  it("deve compor 'Currículo padrão — dd/mm/aaaa' no Modo 1", () => {
+    // Data fixa para não depender do relógio (a função é pura, recebe a data).
+    expect(defaultResumeName("STANDARD", new Date(2026, 4, 30))).toBe(
+      "Currículo padrão — 30/05/2026",
+    );
+  });
+
+  it("deve compor 'Adaptado à vaga — dd/mm/aaaa' no Modo 2", () => {
+    expect(defaultResumeName("JOB_ADAPTIVE", new Date(2026, 4, 30))).toBe(
+      "Adaptado à vaga — 30/05/2026",
+    );
+  });
+
+  it("deve zero-padear dia e mês de um dígito", () => {
+    expect(defaultResumeName("STANDARD", new Date(2026, 0, 5))).toBe(
+      "Currículo padrão — 05/01/2026",
+    );
+  });
+
+  it("deve cair só no rótulo do modo quando a data é inválida", () => {
+    expect(defaultResumeName("STANDARD", "data-invalida")).toBe("Currículo padrão");
+    expect(defaultResumeName("JOB_ADAPTIVE", "nope")).toBe("Adaptado à vaga");
   });
 });
 

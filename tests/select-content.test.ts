@@ -47,6 +47,8 @@ const CONTENT: ResumeContent = {
     },
   ],
   projects: [],
+  languages: [],
+  courses: [],
 };
 
 // Cria um LLMProvider mock cujo método devolve CONTENT e registra os params.

@@ -27,6 +27,10 @@ const VALID_CONTENT: ResumeContent = {
     },
   ],
   projects: [],
+  // languages/courses são aditivos (ADR-0020) com default []: o provider parseia a
+  // saída e os devolve preenchidos, então o objeto esperado precisa tê-los.
+  languages: [],
+  courses: [],
 };
 
 // Monta uma resposta no formato do SDK (choices[0].message.content = string).
@@ -260,7 +264,7 @@ describe("NimProvider.extractProfileFromDump — import por dump (US-11, ADR-001
     expect(err.kind).toBe("transport");
   });
 
-  it("deve usar response_format json_schema 'ProfileBundle' para um modelo com suporte", async () => {
+  it("deve usar response_format json_object e timeout LONGO no import (evita o 502 por timeout)", async () => {
     const { client, create } = makeFakeClient(async () =>
       chatResponse(JSON.stringify(VALID_DRAFT)),
     );
@@ -271,10 +275,14 @@ describe("NimProvider.extractProfileFromDump — import por dump (US-11, ADR-001
       modelId: "meta/llama-3.3-70b-instruct",
     });
 
-    const payload = create.mock.calls[0][0] as {
-      response_format: { type: string; json_schema?: { name: string } };
-    };
-    expect(payload.response_format.type).toBe("json_schema");
-    expect(payload.response_format.json_schema?.name).toBe("ProfileBundle");
+    const body = create.mock.calls[0][0] as { response_format: { type: string } };
+    const options = create.mock.calls[0][1] as { timeout?: number; maxRetries?: number };
+    // json_object (NÃO json_schema): o constrained decoding do schema grande do
+    // ProfileBundle é lento na NIM e estourava o timeout de 60s (502). A forma é garantida
+    // pelo prompt + revalidação Zod tolerante.
+    expect(body.response_format.type).toBe("json_object");
+    // O import usa um timeout bem maior que os 60s da geração + retry limitado.
+    expect(options?.timeout).toBeGreaterThan(60_000);
+    expect(options?.maxRetries).toBe(1);
   });
 });

@@ -104,6 +104,8 @@ const CONTENT: ResumeContent = {
     },
   ],
   projects: [],
+  languages: [],
+  courses: [],
 };
 
 // Conteúdo rastreável à BUNDLE_EDU_ONLY (só formação, sem experiência): casa com
@@ -115,6 +117,8 @@ const CONTENT_EDU: ResumeContent = {
   skills: [],
   experience: [],
   projects: [],
+  languages: [],
+  courses: [],
 };
 
 beforeEach(() => {
@@ -182,6 +186,7 @@ describe("POST /api/resumes/generate — pré-requisito (ADR-0014)", () => {
       async (input: { texOutput: string; modelId: string }) => ({
         id: "gr-edu",
         userId: "user-local",
+        name: "Currículo padrão — 30/05/2026",
         mode: "STANDARD",
         jobPostingId: null,
         modelId: input.modelId,
@@ -210,6 +215,7 @@ describe("POST /api/resumes/generate — caminho feliz (Modo 1)", () => {
     createGeneratedResume.mockImplementation(async (input: { texOutput: string; modelId: string }) => ({
       id: "gr1",
       userId: "user-local",
+      name: "Currículo padrão — 30/05/2026",
       mode: "STANDARD",
       jobPostingId: null,
       modelId: input.modelId,
@@ -256,6 +262,8 @@ describe("POST /api/resumes/generate — guardrail de rastreabilidade (US-07/ADR
       },
     ],
     projects: [],
+    languages: [],
+    courses: [],
   };
 
   it("deve regenerar 1x e, persistindo o erro, responder 422 GUARDRAIL_FAILED sem persistir", async () => {
@@ -285,6 +293,7 @@ describe("POST /api/resumes/generate — guardrail de rastreabilidade (US-07/ADR
       async (input: { texOutput: string; modelId: string }) => ({
         id: "gr2",
         userId: "user-local",
+        name: "Currículo padrão — 30/05/2026",
         mode: "STANDARD",
         jobPostingId: null,
         modelId: input.modelId,
@@ -339,6 +348,7 @@ describe("POST /api/resumes/generate — guardrail de rastreabilidade (US-07/ADR
       async (input: { texOutput: string; modelId: string }) => ({
         id: "gr3",
         userId: "user-local",
+        name: "Currículo padrão — 30/05/2026",
         mode: "STANDARD",
         jobPostingId: null,
         modelId: input.modelId,
@@ -408,6 +418,7 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
       }) => ({
         id: "gr-job",
         userId: "user-local",
+        name: "Adaptado à vaga — 30/05/2026",
         mode: input.mode,
         jobPostingId: input.jobPostingId,
         modelId: input.modelId,
@@ -466,6 +477,8 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
         },
       ],
       projects: [],
+      languages: [],
+      courses: [],
     };
     getProfileBundle.mockResolvedValue(BUNDLE_OK);
     createJobPosting.mockResolvedValue({ id: "job-2", rawText: JOB_TEXT });
@@ -514,6 +527,8 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
         },
       ],
       projects: [],
+      languages: [],
+      courses: [],
     };
     getProfileBundle.mockResolvedValue(BUNDLE_OK);
     createJobPosting.mockResolvedValue({ id: "job-4", rawText: JOB_TEXT });
@@ -530,6 +545,7 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
       }) => ({
         id: "gr-job-regen",
         userId: "user-local",
+        name: "Adaptado à vaga — 30/05/2026",
         mode: input.mode,
         jobPostingId: input.jobPostingId,
         modelId: input.modelId,
@@ -567,6 +583,7 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
       }) => ({
         id: "gr-job-prompt",
         userId: "user-local",
+        name: "Adaptado à vaga — 30/05/2026",
         mode: input.mode,
         jobPostingId: input.jobPostingId,
         modelId: input.modelId,
@@ -600,6 +617,7 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
       }) => ({
         id: "gr-job-noid",
         userId: "user-local",
+        name: "Adaptado à vaga — 30/05/2026",
         mode: input.mode,
         jobPostingId: input.jobPostingId,
         modelId: input.modelId,

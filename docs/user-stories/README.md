@@ -55,6 +55,14 @@ mesma fatia, itens sem dependência mútua podem andar em paralelo.
 |---|---|---|
 | [US-13](./US-13-importar-curriculo-arquivo-ia.md) | Importar currículo por arquivo (PDF/DOCX/TXT) com IA — estende a US-11; `POST /api/profile/import/file`, extração no servidor (`unpdf`+`mammoth`), merge no formulário, sem OCR (PDF-imagem → 422) | US-11, US-02, US-03, US-04, ADR-0019 |
 
+### Fatia 7 — Qualidade da geração + gestão de currículos + limpeza da base
+
+| US | Título | Depende de |
+|---|---|---|
+| [US-14](./US-14-curriculo-completo-fiel-ptbr.md) | Currículo padrão completo e fiel (Modo 1 inclui TUDO da base — projetos com bullets+stack, idiomas, cursos), títulos do `.tex` em PT-BR, links discretos; Modo 2 segue selecionando mas emite os campos novos; invariante intacto | US-05, US-08, US-07, US-01, ADR-0020 |
+| [US-15](./US-15-gestao-curriculos-gerados.md) | Gestão dos currículos: nomear (na geração + renomear), ver/copiar o `.tex`, excluir (com confirmação) e "Abrir no Overleaf"; rotas `PATCH`/`DELETE /api/resumes/[id]`, `GeneratedResume.name` | US-05, US-06, US-09, ADR-0021 |
+| [US-16](./US-16-limpar-base-importar-substituindo.md) | Limpar base (`DELETE /api/profile`, cascade, com confirmação) + toggle Mesclar/Substituir no painel de import (Substituir é cliente: `setBundle(draft)`) | US-02, US-03, US-11, US-13, ADR-0021 |
+
 ### Grafo de dependência resumido
 
 ```
@@ -128,3 +136,10 @@ decisão antes de virar escopo):
 - **[SUGESTÃO ADICIONAL] Layout/navegação do dashboard.** `src/app/layout.tsx` e a
   navegação entre `/perfil`, `/gerar`, `/curriculos` não têm US própria; a spec descreve as
   telas isoladamente. Pode ser uma pequena US de shell de navegação.
+- **[SUGESTÃO ADICIONAL — Fatia 7] "Limpar base" e o histórico de currículos (US-16).** O
+  ADR-0021 diz que `DELETE /api/profile` apaga o `Profile` e que `JobPosting`/`GeneratedResume`
+  "seguem a regra de cascade já existente do schema". Falta uma decisão de **produto** explícita:
+  limpar a base **também apaga os currículos já gerados** (cascade), ou eles **sobrevivem**? Os
+  currículos são entregáveis prontos, geridos pela US-15 — sugiro **preservá-los** ao limpar a
+  base. Marcado como `[DECISÃO PENDENTE]` na US-16 para o architect/dono fecharem antes da
+  implementação (a regra de cascade do Prisma decide o comportamento real).
