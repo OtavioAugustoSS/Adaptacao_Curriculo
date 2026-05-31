@@ -77,8 +77,7 @@ describe("ImportProfileBundleSchema vs ProfileBundleSchema — tolerância do fu
     expect(result.success).toBe(false);
   });
 
-  it("a variante tolerante deve seguir aplicando os defaults das listas e dos itens", () => {
-    // Tolerância é só no fullName; o resto do bundle continua igual ao estrito.
+  it("a variante tolerante deve aplicar os defaults das listas e dos itens", () => {
     const parsed = ImportProfileBundleSchema.parse({
       profile: { fullName: "Otávio" },
       educations: [{ institution: "USP", degree: "BSc", startDate: "2022", current: true }],
@@ -86,5 +85,40 @@ describe("ImportProfileBundleSchema vs ProfileBundleSchema — tolerância do fu
     expect(parsed.experiences).toEqual([]);
     expect(parsed.educations[0].current).toBe(true);
     expect(parsed.educations[0].order).toBe(0);
+  });
+});
+
+describe("ImportProfileBundleSchema — tolerância de ITENS incompletos (regressão do 502)", () => {
+  // BUG: o rascunho do import rejeitava o bundle INTEIRO quando QUALQUER item de lista
+  // vinha sem um campo antes obrigatório (idioma sem nível, formação só com fim, etc.) —
+  // exatamente o que a IA produz ("deixe vazio o que não aparecer") -> LLMError -> 502.
+  // O rascunho agora ACEITA itens incompletos (campo ausente vira ""); a obrigatoriedade
+  // é cobrada só no PUT (ProfileBundleSchema estrito).
+
+  it("deve ACEITAR um currículo real com itens incompletos (campos ausentes -> '')", () => {
+    const result = ImportProfileBundleSchema.safeParse({
+      profile: { fullName: "Maria" },
+      experiences: [{ company: "Acme", role: "Dev" }], // sem startDate
+      educations: [{ institution: "USP", degree: "BSc" }], // sem startDate
+      skills: [{ category: "Linguagens" }], // sem name
+      projects: [{ name: "App" }], // sem description
+      languages: [{ name: "Inglês" }], // sem proficiency (caso comum!)
+      courses: [{ title: "AWS", issuer: "Amazon" }], // sem date
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.experiences[0].startDate).toBe("");
+      expect(result.data.skills[0].name).toBe("");
+      expect(result.data.languages[0].proficiency).toBe("");
+      expect(result.data.courses[0].date).toBe("");
+    }
+  });
+
+  it("o schema ESTRITO deve REJEITAR os mesmos itens incompletos (barreira no PUT)", () => {
+    const incomplete = {
+      profile: { fullName: "Maria" },
+      languages: [{ name: "Inglês" }], // sem proficiency
+    };
+    expect(ProfileBundleSchema.safeParse(incomplete).success).toBe(false);
   });
 });

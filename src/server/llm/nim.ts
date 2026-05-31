@@ -38,31 +38,31 @@ const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_TRANSPORT_RETRIES = 2;
 
 /**
+ * Timeout do IMPORT por dump/arquivo (US-11/US-13): bem maior que a geração. O import
+ * estrutura o currículo INTEIRO num único JSON (muitos bullets) — medido ~50s no
+ * `llama-3.3-70b` na NIM, encostando no limite de 60s da geração e estourando (timeout →
+ * 502). É uma ação única, iniciada pelo usuário, que pode esperar. Override por requisição
+ * (não muda o timeout da geração, que segue 60s).
+ */
+const IMPORT_REQUEST_TIMEOUT_MS = 180_000;
+/** Retries do import: 1 (cobre blip transitório sem multiplicar uma espera já longa). */
+const IMPORT_MAX_RETRIES = 1;
+
+/**
  * Nome do response_format json_schema. Restrição da API: a-z, A-Z, 0-9, `_`/`-`.
  */
 const JSON_SCHEMA_NAME = "ResumeContent";
-
-/** Nome do response_format json_schema do import de perfil (US-11). */
-const PROFILE_BUNDLE_JSON_SCHEMA_NAME = "ProfileBundle";
 
 /**
  * JSON Schema derivado do `ResumeContentSchema` (Zod 4 nativo — sem dependência
  * nova; ADR-0012). Calculado uma vez no carregamento do módulo. Usado só como
  * RESTRIÇÃO DE GERAÇÃO; a validação real continua sendo o `.parse` do Zod.
+ * (Só a GERAÇÃO usa json_schema; o import usa json_object — ver `extractProfileFromDump`.)
  */
 const RESUME_CONTENT_JSON_SCHEMA = z.toJSONSchema(ResumeContentSchema) as Record<
   string,
   unknown
 >;
-
-/**
- * JSON Schema derivado da variante TOLERANTE do bundle (`ImportProfileBundleSchema`,
- * ADR-0018 §5) — guia a saída do import. Mesma técnica/papel do schema acima:
- * RESTRIÇÃO de geração; a validação real é o `safeParse` do Zod (tolerante).
- */
-const PROFILE_BUNDLE_JSON_SCHEMA = z.toJSONSchema(
-  ImportProfileBundleSchema,
-) as Record<string, unknown>;
 
 /**
  * Lê e valida as envs do provedor. Falha cedo com mensagem clara se faltarem —
@@ -198,43 +198,38 @@ export class NimProvider implements LLMProvider {
   }
 
   /**
-   * Extrai um RASCUNHO de perfil a partir de um dump de texto livre (US-11, ADR-0018).
-   * Espelha `generateResumeContent` (mesmo transporte/política de erro), mas com DOIS
-   * pontos distintos: (1) o `response_format` json_schema deriva de
-   * `ImportProfileBundleSchema`; (2) a validação da saída usa a variante TOLERANTE
-   * (`fullName` pode vir vazio — ADR-0018 §5), para que um dump sem nome não vire 502
-   * espúrio. A obrigatoriedade do nome fica no `PUT /api/profile` (estrito).
+   * Extrai um RASCUNHO de perfil a partir de um dump de texto livre/arquivo (US-11/US-13,
+   * ADR-0018/0019). Espelha `generateResumeContent` (mesma política de erro), com TRÊS
+   * diferenças: (1) `response_format: json_object` — NÃO json_schema: o constrained
+   * decoding contra o schema grande/aninhado do ProfileBundle é lento na NIM e estourava o
+   * timeout de 60s da geração (→ 502); (2) timeout LONGO + 1 retry, pois o import estrutura o
+   * currículo INTEIRO num JSON grande (~50s medido); (3) a saída é validada pela variante
+   * TOLERANTE `ImportProfileBundleSchema` (campos ausentes viram "" — ADR-0018 §5; a
+   * obrigatoriedade real fica no `PUT /api/profile` estrito).
    */
   async extractProfileFromDump(
     params: GenerateProfileParams,
   ): Promise<ProfileBundle> {
     const model = resolveModel(params.modelId);
 
-    // response_format: json_schema quando o modelo suporta; senão fallback json_object
-    // (ADR-0012). `strict: false` pela mesma razão da geração (campos `.optional()`).
-    const responseFormat: OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"] =
-      model.supportsJsonSchema
-        ? {
-            type: "json_schema",
-            json_schema: {
-              name: PROFILE_BUNDLE_JSON_SCHEMA_NAME,
-              schema: PROFILE_BUNDLE_JSON_SCHEMA,
-              strict: false,
-            },
-          }
-        : { type: "json_object" };
-
-    // --- Transporte: chamada ao provedor (retry/timeout nativos do SDK) --------
+    // --- Transporte: json_object + timeout LONGO + 1 retry (override por requisição) ----
+    // json_object (não json_schema): o constrained decoding contra o schema grande do
+    // ProfileBundle é lento na NIM e estourava o timeout (502). A forma da saída é garantida
+    // pelo prompt parse-dump + a revalidação Zod (tolerante) logo abaixo — não precisamos do
+    // schema como restrição de geração aqui. O timeout/retry da geração (60s) NÃO muda.
     let raw: string | null | undefined;
     try {
-      const completion = await this.client.chat.completions.create({
-        model: model.id,
-        messages: [
-          { role: "system", content: params.system },
-          { role: "user", content: params.user },
-        ],
-        response_format: responseFormat,
-      });
+      const completion = await this.client.chat.completions.create(
+        {
+          model: model.id,
+          messages: [
+            { role: "system", content: params.system },
+            { role: "user", content: params.user },
+          ],
+          response_format: { type: "json_object" },
+        },
+        { timeout: IMPORT_REQUEST_TIMEOUT_MS, maxRetries: IMPORT_MAX_RETRIES },
+      );
       raw = completion.choices[0]?.message?.content;
     } catch (err) {
       if (isTransportError(err)) {

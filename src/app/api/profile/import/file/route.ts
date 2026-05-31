@@ -87,6 +87,13 @@ export async function POST(req: NextRequest) {
     // 5. Devolve o rascunho para o formulário mesclar/revisar.
     return NextResponse.json(bundle);
   } catch (err) {
+    // Observabilidade: o 502/500 some na UI (mensagem amigável); logamos a causa real
+    // (kind + cause do LLMError, ou o erro cru) no servidor para diagnóstico.
+    console.error(
+      "[/api/profile/import/file] falha:",
+      err instanceof LLMError ? `LLMError(${err.kind})` : err,
+      err instanceof LLMError ? err.cause : undefined,
+    );
     // Tipo fora da whitelist (defesa redundante à checagem acima) -> 415.
     if (err instanceof UnsupportedFileTypeError) {
       return errorResponse(415, "UNSUPPORTED_MEDIA_TYPE", err.message);

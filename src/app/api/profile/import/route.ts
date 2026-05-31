@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
     // 4. Devolve o rascunho para o formulário mesclar/revisar.
     return NextResponse.json(bundle);
   } catch (err) {
+    // Observabilidade: logamos a causa real (kind + cause do LLMError) no servidor —
+    // a UI só mostra a mensagem amigável.
+    console.error(
+      "[/api/profile/import] falha:",
+      err instanceof LLMError ? `LLMError(${err.kind})` : err,
+      err instanceof LLMError ? err.cause : undefined,
+    );
     // Falha da camada de IA (transporte ou validação da saída) -> 502 (ADR-0012/0018).
     if (err instanceof LLMError) {
       return errorResponse(
