@@ -1,7 +1,12 @@
 # 0022 — Currículo padrão (`isDefault`) e adaptação ancorada em referência de profundidade
 
-- **Status:** Accepted
+- **Status:** Accepted (a parte de **referência de profundidade** foi superseded by [[0027-adaptacao-vaga-2-passos-prompt-rearquitetado]])
 - **Data:** 2026-05-31
+
+> **Nota (2026-05-31):** o **currículo padrão (`isDefault`)** e a seleção de base na geração seguem
+> válidos. O **mecanismo de "adaptação ancorada em referência de profundidade"** (injetar o currículo
+> padrão inteiro como gabarito de completude) foi **substituído** pelo [[0027-adaptacao-vaga-2-passos-prompt-rearquitetado]]:
+> mostrou-se a causa de o Modo 2 **copiar** a base em vez de adaptar.
 
 ## Contexto
 

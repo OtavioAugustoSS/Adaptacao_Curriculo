@@ -26,8 +26,9 @@ const createJobPosting = vi.hoisted(() => vi.fn());
 vi.mock("@/server/data/job-repo", () => ({ createJobPosting }));
 
 const generateResumeContent = vi.hoisted(() => vi.fn());
+const analyzeJob = vi.hoisted(() => vi.fn());
 vi.mock("@/server/llm", () => ({
-  getLLMProvider: () => ({ generateResumeContent }),
+  getLLMProvider: () => ({ generateResumeContent, analyzeJob }),
 }));
 
 import { POST } from "@/app/api/resumes/generate/route";
@@ -608,15 +609,10 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
     expect(params.user).toContain("exp-1");
   });
 
-  it("deve carregar o currículo base (baseResumeId) e injetá-lo como referência (ADR-0022)", async () => {
+  it("Modo 2 NÃO injeta mais currículo-referência nem consulta base/padrão na geração (ADR-0027)", async () => {
     getProfileBundle.mockResolvedValue(BUNDLE_OK);
     createJobPosting.mockResolvedValue({ id: "job-6", rawText: JOB_TEXT });
     generateResumeContent.mockResolvedValue(CONTENT);
-    // O currículo base selecionado tem um ResumeContent (contentJson) com marcador único.
-    getGeneratedResumeById.mockResolvedValue({
-      id: "base-1",
-      contentJson: { ...CONTENT, objective: "REFERENCIA_MARCADOR_UNICO" },
-    });
     createGeneratedResume.mockImplementation(
       async (input: { texOutput: string; modelId: string; mode: string; jobPostingId: string | null }) => ({
         id: "gr-base",
@@ -632,28 +628,34 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
       }),
     );
 
+    // Mesmo com baseResumeId no request, a geração não carrega mais o currículo-referência
+    // (ADR-0027 substituiu o gabarito por regra sobre a base).
     const res = await POST(
       makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT, baseResumeId: "base-1" }),
     );
 
     expect(res.status).toBe(200);
-    // Carregou o base por id, e NÃO recorreu ao padrão (baseResumeId tem prioridade).
-    expect(getGeneratedResumeById).toHaveBeenCalledWith("base-1");
+    expect(getGeneratedResumeById).not.toHaveBeenCalled();
     expect(getDefaultResume).not.toHaveBeenCalled();
-    // O conteúdo do base entrou no prompt como referência de profundidade.
     const params = generateResumeContent.mock.calls[0][0];
-    expect(params.user).toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
-    expect(params.user).toContain("REFERENCIA_MARCADOR_UNICO");
+    expect(params.user).not.toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
   });
 
-  it("deve recorrer ao currículo padrão quando não vem baseResumeId (ADR-0022)", async () => {
+  it("Modo 2 injeta a ANÁLISE DA VAGA no prompt quando o provider a fornece (ADR-0027)", async () => {
     getProfileBundle.mockResolvedValue(BUNDLE_OK);
     createJobPosting.mockResolvedValue({ id: "job-7", rawText: JOB_TEXT });
     generateResumeContent.mockResolvedValue(CONTENT);
-    getDefaultResume.mockResolvedValue(null); // sem padrão → sem referência (fallback base)
+    analyzeJob.mockResolvedValue({
+      role: "Backend",
+      seniority: "",
+      domain: "back-end",
+      mustHave: ["testes automatizados"],
+      niceToHave: [],
+      keywords: ["MARCADOR_KEYWORD"],
+    });
     createGeneratedResume.mockImplementation(
       async (input: { texOutput: string; modelId: string; mode: string; jobPostingId: string | null }) => ({
-        id: "gr-nodefault",
+        id: "gr-an",
         userId: "user-local",
         name: "Adaptado à vaga — 31/05/2026",
         mode: input.mode,
@@ -669,11 +671,10 @@ describe("POST /api/resumes/generate — Modo 2 (JOB_ADAPTIVE, US-08)", () => {
     const res = await POST(makeRequest({ mode: "JOB_ADAPTIVE", jobText: JOB_TEXT }));
 
     expect(res.status).toBe(200);
-    // Sem baseResumeId → consulta o padrão; sem padrão → sem bloco de referência.
-    expect(getDefaultResume).toHaveBeenCalledTimes(1);
-    expect(getGeneratedResumeById).not.toHaveBeenCalled();
+    expect(analyzeJob).toHaveBeenCalledTimes(1);
     const params = generateResumeContent.mock.calls[0][0];
-    expect(params.user).not.toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+    expect(params.user).toContain("ANÁLISE DA VAGA");
+    expect(params.user).toContain("MARCADOR_KEYWORD");
   });
 
   it("deve persistir jobPostingId null quando a vaga criada não traz id (fallback ?? null)", async () => {

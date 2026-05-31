@@ -1,7 +1,12 @@
 # 0023 — Geração rica: timeout, prompts compactos e tailoring (achados do e2e real)
 
-- **Status:** Accepted
+- **Status:** Accepted (tailoring do Modo 2 refinado por [[0027-adaptacao-vaga-2-passos-prompt-rearquitetado]])
 - **Data:** 2026-05-31
+
+> **Nota (2026-05-31):** os **timeouts/temperatura/prompts compactos** seguem válidos. O **reforço de
+> tailoring** do Modo 2 aqui mostrou-se insuficiente (o Modo 2 ainda copiava a base); o
+> [[0027-adaptacao-vaga-2-passos-prompt-rearquitetado]] o **refina** com pipeline de 2 passos
+> (análise da vaga → adaptação) e re-arquitetura do prompt.
 
 ## Contexto
 

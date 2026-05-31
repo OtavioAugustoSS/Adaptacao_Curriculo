@@ -32,10 +32,12 @@ Idioma: PT-BR. Cada arquivo segue o padrão `NNNN-slug.md` (kebab-case).
 | [0019](0019-import-perfil-por-arquivo.md) | Fatia 6: importar currículo por arquivo (PDF/DOCX/TXT) | Accepted |
 | [0020](0020-resume-content-enriquecido-geracao-completa.md) | Fatia 7: `ResumeContent` enriquecido (idiomas, cursos, bullets+stack de projeto); geração completa e fiel | Accepted |
 | [0021](0021-gestao-curriculos-nome-editar-excluir-limpar-base.md) | Fatia 7: gestão de currículos (nome/editar/excluir) e limpar a base | Accepted |
-| [0022](0022-curriculo-padrao-adaptacao-referencia-profundidade.md) | Fatia 8: currículo padrão (`isDefault`) e adaptação ancorada em referência de profundidade | Accepted |
-| [0023](0023-geracao-rica-timeout-prompts-tailoring.md) | Geração rica: timeout 180s+1retry+temp 0.3, prompts compactos, tailoring (achados do e2e real) | Accepted |
+| [0022](0022-curriculo-padrao-adaptacao-referencia-profundidade.md) | Fatia 8: currículo padrão (`isDefault`) e adaptação ancorada em referência de profundidade | Accepted (referência-de-profundidade superseded by 0027) |
+| [0023](0023-geracao-rica-timeout-prompts-tailoring.md) | Geração rica: timeout 180s+1retry+temp 0.3, prompts compactos, tailoring (achados do e2e real) | Accepted (tailoring refinado por 0027) |
 | [0024](0024-autenticacao-real-authjs-oauth-seam-async.md) | Fatia 9: autenticação real (Auth.js/OAuth) e seam de identidade assíncrono | Accepted |
 | [0025](0025-migracao-sqlite-postgres-multiusuario.md) | Fatia 9: migração SQLite → Postgres para deploy multiusuário | Accepted |
+| [0026](0026-api-401-json-sob-auth.md) | Fatia 10: rotas de API retornam 401 JSON sob auth (não redirecionam) | Accepted |
+| [0027](0027-adaptacao-vaga-2-passos-prompt-rearquitetado.md) | Fatia 10: adaptação à vaga em 2 passos (análise→adaptação) + prompt re-arquitetado | Accepted |
 
 ## Template padrão de ADR
 

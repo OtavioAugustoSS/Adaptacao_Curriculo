@@ -4,7 +4,15 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-31 — **Fatia 9 (ADR-0024/ADR-0025)** — mudanças **aditivas** (autenticação/infra).
+> Última alteração: 2026-05-31 — **Fatia 10 (ADR-0026/ADR-0027)** — mudanças **aditivas/comportamentais**, contrato de domínio **inalterado**.
+> **ADR-0026:** rotas **`/api/*`** sem sessão passam a responder **`401` com envelope JSON** `{ error: { code:
+> "UNAUTHENTICATED", ... } }` (antes redirecionavam para `/login` em HTML) — refina o middleware da F9.
+> **ADR-0027 (adaptação à vaga):** o Modo 2 vira pipeline de **2 passos** (análise da vaga → adaptação); a
+> análise é **andaime interno** (não há campo novo no request/response). **`GenerateRequest` inalterado** —
+> `baseResumeId` segue **aceito**, mas deixou de ser usado como "referência de profundidade" (supersede essa
+> parte do ADR-0022). `ResumeContentSchema`, renderer e guardrail **intactos**; invariante anti-alucinação intacto.
+>
+> 2026-05-31 — **Fatia 9 (ADR-0024/ADR-0025)** — mudanças **aditivas** (autenticação/infra).
 > **ADR-0024/0025 (multiusuário):** o domínio (schemas Zod + rotas de negócio) **não muda**. Adições de
 > infraestrutura: rota **`/api/auth/[...nextauth]`** (Auth.js — login OAuth Google/GitHub) e a página
 > **`/login`**; o seam `getCurrentUserId()` passa a ler a **sessão real** (assíncrono; 401 sem sessão) e o

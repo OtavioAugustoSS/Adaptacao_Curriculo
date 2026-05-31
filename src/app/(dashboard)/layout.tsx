@@ -96,7 +96,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+    // Re-busca as contagens ao navegar (ex.: salvar no /perfil e ir ao /curriculos),
+    // pra refletir mudanças sem exigir reload (bônus do fix das contagens, ADR-0026).
+  }, [pathname]);
 
   function isActive(href: string): boolean {
     if (href === "/") return pathname === "/";

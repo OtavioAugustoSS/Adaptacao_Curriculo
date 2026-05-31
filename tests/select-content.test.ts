@@ -5,8 +5,13 @@ import {
 } from "@/server/resume/select-content";
 import { STANDARD_CV_SYSTEM_PROMPT } from "@/server/llm/prompts/standard-cv";
 import { JOB_ADAPTIVE_CV_SYSTEM_PROMPT } from "@/server/llm/prompts/job-adaptive-cv";
-import type { GenerateResumeParams, LLMProvider } from "@/server/llm/provider";
+import type {
+  GenerateResumeParams,
+  GenerateJobAnalysisParams,
+  LLMProvider,
+} from "@/server/llm/provider";
 import type { ProfileBundle, ResumeContent } from "@/lib/schemas";
+import type { JobAnalysis } from "@/server/llm/job-analysis";
 
 // Testes de COMPORTAMENTO da ponte base -> LLM -> ResumeContent (US-05).
 // O LLMProvider é a FRONTEIRA (US-04): injetamos um mock e verificamos que
@@ -51,15 +56,26 @@ const CONTENT: ResumeContent = {
   courses: [],
 };
 
-// Cria um LLMProvider mock cujo método devolve CONTENT e registra os params.
-// Tipamos o vi.fn com a assinatura do método para que `.mock.calls` carregue o
-// tipo de `GenerateResumeParams` (senão o TS infere uma tupla vazia).
+// Análise da vaga (ADR-0027, passo 1) que o mock devolve. A keyword única vira marcador
+// para verificar a injeção no user prompt do passo 2.
+const ANALYSIS: JobAnalysis = {
+  role: "Backend Node",
+  seniority: "",
+  domain: "back-end",
+  mustHave: ["testes automatizados"],
+  niceToHave: [],
+  keywords: ["MARCADOR_KW", "Node"],
+};
+
+// Cria um LLMProvider mock cujos métodos devolvem CONTENT/ANALYSIS e registram os params.
+// Tipamos os vi.fn com a assinatura do método para que `.mock.calls` carregue o tipo certo.
 function makeProvider() {
   const generateResumeContent = vi.fn(
     async (_params: GenerateResumeParams) => CONTENT,
   );
-  const provider = { generateResumeContent } as unknown as LLMProvider;
-  return { provider, generateResumeContent };
+  const analyzeJob = vi.fn(async (_params: GenerateJobAnalysisParams) => ANALYSIS);
+  const provider = { generateResumeContent, analyzeJob } as unknown as LLMProvider;
+  return { provider, generateResumeContent, analyzeJob };
 }
 
 describe("generateStandardContent", () => {
@@ -147,22 +163,29 @@ describe("generateJobAdaptiveContent (Modo 2)", () => {
     ).rejects.toThrow("falha do provider");
   });
 
-  it("deve injetar o currículo base como referência de profundidade quando fornecido (ADR-0022)", async () => {
-    const { provider, generateResumeContent } = makeProvider();
-    // CONTENT serve de baseContent (é um ResumeContent válido); o id real garante marcador.
-    await generateJobAdaptiveContent(BUNDLE, JOB_TEXT, provider, undefined, CONTENT);
-
-    const params = generateResumeContent.mock.calls[0][0];
-    expect(params.user).toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
-    // O system NÃO muda com baseContent (a referência vai só no user prompt).
-    expect(params.system).toBe(JOB_ADAPTIVE_CV_SYSTEM_PROMPT);
-  });
-
-  it("NÃO deve incluir referência quando baseContent é ausente (retrocompat)", async () => {
-    const { provider, generateResumeContent } = makeProvider();
+  it("deve chamar analyzeJob (passo 1) e injetar a ANÁLISE DA VAGA no user prompt (ADR-0027)", async () => {
+    const { provider, generateResumeContent, analyzeJob } = makeProvider();
     await generateJobAdaptiveContent(BUNDLE, JOB_TEXT, provider);
 
+    expect(analyzeJob).toHaveBeenCalledTimes(1);
     const params = generateResumeContent.mock.calls[0][0];
+    expect(params.user).toContain("ANÁLISE DA VAGA");
+    expect(params.user).toContain("MARCADOR_KW"); // keyword da análise mock
+    // O system NÃO muda (a análise vai só no user prompt); e não há mais referência (ADR-0027).
+    expect(params.system).toBe(JOB_ADAPTIVE_CV_SYSTEM_PROMPT);
     expect(params.user).not.toContain("CURRÍCULO PADRÃO DE REFERÊNCIA");
+  });
+
+  it("deve ser resiliente: se analyzeJob falhar, adapta sem a análise (ADR-0027)", async () => {
+    const generateResumeContent = vi.fn(async (_p: GenerateResumeParams) => CONTENT);
+    const analyzeJob = vi.fn(async () => {
+      throw new Error("falha da análise");
+    });
+    const provider = { generateResumeContent, analyzeJob } as unknown as LLMProvider;
+
+    const result = await generateJobAdaptiveContent(BUNDLE, JOB_TEXT, provider);
+    expect(result).toEqual(CONTENT); // a falha da análise NÃO propaga
+    const params = generateResumeContent.mock.calls[0][0];
+    expect(params.user).not.toContain("ANÁLISE DA VAGA"); // sem análise → sem bloco
   });
 });

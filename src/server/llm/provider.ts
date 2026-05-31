@@ -8,6 +8,7 @@
 // validação Zod dentro do adapter é a fronteira de confiança real.
 
 import type { ResumeContent, ProfileBundle } from "@/lib/schemas";
+import type { JobAnalysis } from "./job-analysis";
 
 /**
  * Parâmetros de uma geração de conteúdo de currículo.
@@ -45,6 +46,20 @@ export interface GenerateProfileParams {
 }
 
 /**
+ * Parâmetros da ANÁLISE de uma vaga (ADR-0027, passo 1). Mesma forma system/user/modelId:
+ * o prompt é montado FORA (`prompts/analyze-job.ts`) e entra como string. É andaime interno
+ * (guia o passo 2), não fonte de fatos — o guardrail segue validando contra a base.
+ */
+export interface GenerateJobAnalysisParams {
+  /** System: "ANALISE a vaga; extraia papel/área/must-have/keywords; não invente requisitos". */
+  system: string;
+  /** User: o texto cru da vaga colada pelo usuário. */
+  user: string;
+  /** Id do modelo (opcional): resolvido por `MODEL_ID`/catálogo se ausente (ADR-0004). */
+  modelId?: string;
+}
+
+/**
  * Seam de acesso ao LLM. Implementações: `NimProvider` (`nim.ts`).
  * Os testes mockam ESTA interface para isolar o orquestrador do transporte.
  */
@@ -74,6 +89,22 @@ export interface LLMProvider {
    *                    ou `validation` (saída não-conforme ao bundle → 502, sem retry).
    */
   extractProfileFromDump(params: GenerateProfileParams): Promise<ProfileBundle>;
+
+  /**
+   * Analisa uma VAGA e devolve um resumo estruturado dos requisitos (ADR-0027, passo 1 do
+   * pipeline de adaptação). Extensão ADITIVA: NÃO altera os outros métodos.
+   *
+   * É andaime interno que GUIA o passo 2 (adaptação) — NÃO é fonte de fatos do currículo;
+   * o guardrail (`validate-traceability.ts`) segue validando contra a BASE, nunca contra esta
+   * análise. Saída validada pelo `JobAnalysisSchema` (tolerante: campos default "" / []), para
+   * uma vaga atípica não dar 502 espúrio (o passo 2 ainda adapta a partir da base).
+   *
+   * @returns `JobAnalysis` validado no adapter.
+   * @throws {LLMError} `transport` (rede/credencial/timeout/5xx esgotado) ou `validation`
+   *                    (saída não-conforme). O orquestrador (select-content) é RESILIENTE: em
+   *                    falha aqui, adapta sem a análise (não vira novo modo de 502).
+   */
+  analyzeJob(params: GenerateJobAnalysisParams): Promise<JobAnalysis>;
 }
 
 /**

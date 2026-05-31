@@ -24,9 +24,11 @@ import {
   type ResumeContent,
   type ProfileBundle,
 } from "@/lib/schemas";
+import { JobAnalysisSchema, type JobAnalysis } from "./job-analysis";
 import type {
   GenerateResumeParams,
   GenerateProfileParams,
+  GenerateJobAnalysisParams,
   LLMProvider,
 } from "./provider";
 import { LLMError } from "./provider";
@@ -65,6 +67,13 @@ const GENERATION_TEMPERATURE = 0.3;
 const IMPORT_REQUEST_TIMEOUT_MS = 180_000;
 /** Retries do import: 1 (cobre blip transitório sem multiplicar uma espera já longa). */
 const IMPORT_MAX_RETRIES = 1;
+
+/**
+ * Timeout da ANÁLISE da vaga (ADR-0027, passo 1): chamada pequena/rápida (só lê a vaga e
+ * resume requisitos). Curto — não precisa dos 180s da montagem. 1 retry para blip transitório.
+ */
+const ANALYZE_REQUEST_TIMEOUT_MS = 45_000;
+const ANALYZE_MAX_RETRIES = 1;
 
 /**
  * Nome do response_format json_schema. Restrição da API: a-z, A-Z, 0-9, `_`/`-`.
@@ -301,5 +310,57 @@ export class NimProvider implements LLMProvider {
     // A variante tolerante difere do `ProfileBundle` só por `fullName` poder ser ""
     // (que é um `string` válido); o rascunho é estruturalmente um ProfileBundle.
     return result.data as ProfileBundle;
+  }
+
+  /**
+   * Analisa uma VAGA → `JobAnalysis` (ADR-0027, passo 1). Mesma política de erro dos demais
+   * métodos, com: `json_object` (schema pequeno; não precisa de json_schema), timeout CURTO +
+   * 1 retry (é uma chamada leve) e temperatura baixa, e validação tolerante pelo `JobAnalysisSchema`.
+   */
+  async analyzeJob(params: GenerateJobAnalysisParams): Promise<JobAnalysis> {
+    const model = resolveModel(params.modelId);
+
+    let raw: string | null | undefined;
+    try {
+      const completion = await this.client.chat.completions.create(
+        {
+          model: model.id,
+          messages: [
+            { role: "system", content: params.system },
+            { role: "user", content: params.user },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.2,
+        },
+        { timeout: ANALYZE_REQUEST_TIMEOUT_MS, maxRetries: ANALYZE_MAX_RETRIES },
+      );
+      raw = completion.choices[0]?.message?.content;
+    } catch (err) {
+      if (isTransportError(err)) {
+        throw new LLMError("transport", "Falha ao comunicar com o provedor de IA (NIM).", err);
+      }
+      throw new LLMError("transport", "Erro inesperado ao chamar o provedor de IA.", err);
+    }
+
+    if (!raw) {
+      throw new LLMError("validation", "O provedor de IA retornou uma resposta vazia.");
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      throw new LLMError("validation", "A saída do modelo não é JSON válido.", err);
+    }
+
+    const result = JobAnalysisSchema.safeParse(parsed);
+    if (!result.success) {
+      throw new LLMError(
+        "validation",
+        "A saída do modelo não está conforme o JobAnalysisSchema.",
+        result.error,
+      );
+    }
+    return result.data;
   }
 }

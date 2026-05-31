@@ -25,11 +25,7 @@ import {
 } from "@/lib/schemas";
 import { errorResponse, validationErrorResponse } from "@/lib/http";
 import { getProfileBundle } from "@/server/data/profile-repo";
-import {
-  createGeneratedResume,
-  getGeneratedResumeById,
-  getDefaultResume,
-} from "@/server/data/resume-repo";
+import { createGeneratedResume } from "@/server/data/resume-repo";
 import { createJobPosting } from "@/server/data/job-repo";
 import {
   meetsGenerationPrerequisite,
@@ -116,17 +112,12 @@ export async function POST(req: NextRequest) {
       const jobPosting = await createJobPosting({ rawText: jobText });
       jobPostingId = jobPosting.id ?? null;
 
-      // Referência de profundidade (ADR-0022): usa o currículo base selecionado
-      // (`baseResumeId`) ou, na ausência, o currículo padrão do usuário. É só REFERÊNCIA
-      // de completude/estrutura no prompt — NÃO é fonte de fatos (o guardrail valida
-      // contra a base). baseResumeId inexistente/alheio → sem referência (deriva da base).
-      const baseResume = parsed.data.baseResumeId
-        ? await getGeneratedResumeById(parsed.data.baseResumeId)
-        : await getDefaultResume();
-      const baseContent = baseResume?.contentJson;
-
+      // ADR-0027: pipeline de 2 passos (análise da vaga → adaptação), encapsulado em
+      // generateJobAdaptiveContent. NÃO se injeta mais o currículo-referência (ADR-0022),
+      // que causava o copy-paste; o anti-encolhimento virou regra sobre a base. O campo
+      // `baseResumeId` do contrato segue aceito, mas deixou de ser usado como gabarito.
       generate = () =>
-        generateJobAdaptiveContent(bundle, jobText, provider, modelId, baseContent);
+        generateJobAdaptiveContent(bundle, jobText, provider, modelId);
     } else {
       generate = () => generateStandardContent(bundle, provider, modelId);
     }

@@ -42,6 +42,15 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     label: "Llama 3.1 70B Instruct",
     supportsJsonSchema: false,
   },
+  // NVIDIA Nemotron afinado para instruction-following/raciocínio (Fatia 10/ADR-0027):
+  // obedece melhor as regras "não encolher / não inventar" da adaptação à vaga. Validado
+  // contra a NIM (devolve JSON limpo com `json_object`). Marcado false → usa o fallback
+  // json_object (não dependemos de json_schema neste modelo). Velocidade ~ do 70B.
+  "nvidia/llama-3.3-nemotron-super-49b-v1": {
+    id: "nvidia/llama-3.3-nemotron-super-49b-v1",
+    label: "Llama 3.3 Nemotron Super 49B",
+    supportsJsonSchema: false,
+  },
 };
 
 /**

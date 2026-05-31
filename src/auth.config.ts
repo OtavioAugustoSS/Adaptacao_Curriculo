@@ -22,20 +22,9 @@ export const authConfig = {
   session: { strategy: "jwt" },
 
   callbacks: {
-    // Proteção de rotas no middleware (Edge). `/login` é público; todo o resto exige
-    // sessão. Já-logado em /login é mandado para a home. Ver ADR-0024 §4.
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isOnLogin = nextUrl.pathname.startsWith("/login");
-      if (isOnLogin) {
-        if (isLoggedIn) return Response.redirect(new URL("/", nextUrl));
-        return true;
-      }
-      return isLoggedIn;
-    },
-
     // Propaga o id do usuário (do adapter, no 1º login) para o token e a sessão, para
     // o seam getCurrentUserId() lê-lo via auth(). Ver ADR-0024 §2.
+    // (A decisão de acesso/redirect vive no middleware.ts — ADR-0026.)
     jwt({ token, user }) {
       if (user?.id) token.id = user.id;
       return token;
