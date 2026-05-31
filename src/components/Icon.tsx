@@ -1,4 +1,4 @@
-// Conjunto de ícones do CV-Adapter — traços lucide-style (stroke).
+// Conjunto de ícones da Forja de Currículo — traços lucide-style (stroke).
 // Portado de docs/design/claude-design/app/icons.jsx para um componente tipado.
 // Cada ícone é uma string de paths separados por " M"; renderizamos um <path> por segmento.
 

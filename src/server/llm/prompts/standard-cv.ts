@@ -55,7 +55,8 @@ Em "experience", "sourceId" é OBRIGATÓRIO e deve ser o id do item corresponden
  * o `ProfileBundle` cru — inclui os `id` reais, que viram os `sourceId` da saída.
  */
 export function buildStandardCvUserPrompt(bundle: ProfileBundle): string {
-  const base = JSON.stringify(bundle, null, 2);
+  // JSON compacto (ADR-0023): sem indentação — mesma informação, menos tokens (mais rápido).
+  const base = JSON.stringify(bundle);
   return `BASE DE DADOS DO USUÁRIO (fonte da verdade — use apenas o que está aqui):
 
 ${base}

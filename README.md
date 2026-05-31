@@ -1,4 +1,6 @@
-# CV-Adapter — Adaptação de Currículo com IA
+# Forja de Currículo — Adaptação de Currículo com IA
+
+> Antes chamado **CV-Adapter** (o nome antigo aparece em ADRs/releases por serem registros históricos).
 
 Aplicação web que usa IA para adaptar seu currículo ao template LaTeX
 [faangpath-simple-template](https://www.overleaf.com/latex/templates/faangpath-simple-template/npsfpdqnxmbc)

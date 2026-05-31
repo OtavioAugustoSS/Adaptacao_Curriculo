@@ -32,10 +32,28 @@ import type {
 import { LLMError } from "./provider";
 import { resolveModel } from "./models";
 
-/** Timeout por requisição ao provedor (ADR-0012: 60s). */
+/** Timeout-base do cliente (ADR-0012: 60s). Geração e import fazem override por requisição. */
 const REQUEST_TIMEOUT_MS = 60_000;
 /** Retries em falha transitória (ADR-0012: até 2). Aplicado pelo SDK no transporte. */
 const MAX_TRANSPORT_RETRIES = 2;
+
+/**
+ * Timeout da GERAÇÃO (ADR-0023): 180s + 1 retry. O e2e real mostrou que, com o output mais
+ * rico (Fatia 8/ADR-0022), UMA geração passa de ~60s → o corte de 60s aborta e o SDK
+ * re-tenta (até 2×), virando ~180s de "retry storm" (e 502 quando as 3 tentativas estouram).
+ * Dar 180s a UMA tentativa elimina o retry storm (cai para ~60–80s) e o risco de 502. Espelha
+ * o import; `json_schema` é mantido (a lentidão era o corte, não o constrained decoding).
+ */
+const GENERATION_REQUEST_TIMEOUT_MS = 180_000;
+/** Retries da geração: 1 (uma chamada de até 180s não deve ser re-tentada 2×). */
+const GENERATION_MAX_RETRIES = 1;
+/**
+ * Temperatura da geração (ADR-0023): baixa. Gerar currículo é tarefa FIEL (selecionar,
+ * reordenar e reescrever itens reais), não criativa. O e2e mostrou variância alta com a
+ * temperatura padrão (uma geração mantinha tudo, outra cortava metade). 0.3 reduz a
+ * variância e melhora a aderência às instruções (manter o conjunto + a profundidade).
+ */
+const GENERATION_TEMPERATURE = 0.3;
 
 /**
  * Timeout do IMPORT por dump/arquivo (US-11/US-13): bem maior que a geração. O import
@@ -140,14 +158,20 @@ export class NimProvider implements LLMProvider {
     // --- Transporte: chamada ao provedor (retry/timeout nativos do SDK) --------
     let raw: string | null | undefined;
     try {
-      const completion = await this.client.chat.completions.create({
-        model: model.id,
-        messages: [
-          { role: "system", content: params.system },
-          { role: "user", content: params.user },
-        ],
-        response_format: responseFormat,
-      });
+      const completion = await this.client.chat.completions.create(
+        {
+          model: model.id,
+          messages: [
+            { role: "system", content: params.system },
+            { role: "user", content: params.user },
+          ],
+          response_format: responseFormat,
+          temperature: GENERATION_TEMPERATURE,
+        },
+        // ADR-0023: timeout longo + 1 retry (override por requisição) — evita o retry storm
+        // de 60s na geração rica. Não muda o timeout-base do cliente (outras chamadas).
+        { timeout: GENERATION_REQUEST_TIMEOUT_MS, maxRetries: GENERATION_MAX_RETRIES },
+      );
       raw = completion.choices[0]?.message?.content;
     } catch (err) {
       if (isTransportError(err)) {

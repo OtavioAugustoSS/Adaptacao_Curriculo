@@ -9,8 +9,8 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "CV-Adapter",
-  description: "Adaptação de currículos com IA para o template faangpath (Overleaf).",
+  title: "Forja de Currículo",
+  description: "Forje seu currículo com IA para o template faangpath (Overleaf) — adaptado a cada vaga, sem inventar nada.",
 };
 
 // Tema controlado por data-theme no <html> (ADR-0017 §4). Default dark

@@ -116,8 +116,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <aside className="sidebar">
         <Link href="/" className="sb-brand" onClick={closeMenu} style={{ textDecoration: "none" }}>
-          <span className="logo">cv</span>
-          <span>CV-Adapter</span>
+          <span className="logo">fc</span>
+          <span>Forja de Currículo</span>
         </Link>
         <nav className="sb-nav" aria-label="Navegação principal">
           <div className="navhead">Navegação</div>
@@ -149,8 +149,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <button type="button" className="icon-btn" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>
             <Icon name="menu" />
           </button>
-          <span className="logo">cv</span>
-          <span style={{ fontWeight: 600, letterSpacing: "-.01em" }}>CV-Adapter</span>
+          <span className="logo">fc</span>
+          <span style={{ fontWeight: 600, letterSpacing: "-.01em" }}>Forja de Currículo</span>
           <span style={{ flex: 1 }} />
           <span className="mono" style={{ color: "var(--fg-muted)", fontSize: 12 }}>
             {LABEL_FOR[pathname] ?? ""}

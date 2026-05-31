@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-**CV-Adapter** — a web app that uses AI to adapt a user's résumé into the Overleaf
+**Forja de Currículo** (formerly **CV-Adapter** — the old name remains in ADRs/release notes as
+historical records) — a web app that uses AI to adapt a user's résumé into the Overleaf
 **faangpath-simple-template** LaTeX format. The user maintains one structured **personal
 data base** (the source of truth), and the system generates a `.tex` file in two modes:
 
@@ -39,17 +40,30 @@ implementada mas NÃO commitada** — está só no working tree):
   **adaptação mais rica** — o Modo 2 deixa o viés de "enxugar" e vira **Equilibrado** + recebe o currículo
   padrão como **referência de profundidade** (não é fonte de fatos; guardrail/`ResumeContent`/renderer
   **inalterados**). Implementada **direto pelo lead** a pedido do dono (sem o time de 5 papéis), ADR-first.
+  **Commitada pelo dono** em `a414eed`.
+- **Pós-F8 — rename + ADR-0023 (no working tree, NÃO commitado):** o produto foi **renomeado de `CV-Adapter`
+  para `Forja de Currículo`** (strings de UI, `package.json` `forja-de-curriculo`, README/ARCHITECTURE/
+  CLAUDE; ADRs/releases ficam com o nome antigo por serem histórico). E o **e2e real com a NIM** (validação
+  pedida pelo dono) revelou que o Modo 2 rico estourava o timeout de 60s (retry storm → **182s**, risco de
+  502): **ADR-0023** corrige — geração com **timeout 180s + 1 retry + `temperature: 0.3`** e **JSON compacto**
+  nos prompts → caiu para **~65s**; e o prompt do Modo 2 ganhou reforço de **tailoring** (objetivo focado na
+  vaga) + **preservar todos os itens/bullets**. Resultado e2e final: `.tex` 3.414→**5.932**, 2 exp (5+5
+  bullets) + 3 projetos fiéis à base, objetivo PHP, guardrail 0/0, sem inventar.
 
-`tsc` clean · `npm test` **330/330** · `next build` OK (13 rotas). **`main` está 4 commits à frente de
-`origin/main` e NÃO foi feito push**; **a Fatia 8 ainda está no working tree, NÃO commitada** (o lead
-**propõe** o commit; não commita sozinho, salvo pedido explícito do dono). Últimos commits em `main`:
-`4eb0f79` (F5), `73b9018` (F6), `de42249` (fix import 502), `1cdc99e` (F7).
+`tsc` clean · `npm test` **330/330** · `next build` OK (13 rotas). **`main`** tem a Fatia 8 (`a414eed`) e
+está **à frente de `origin/main` sem push** (o dono empurra). O **rename + ADR-0023 estão no working tree,
+NÃO commitados** (o lead **propõe**; não commita sozinho, salvo pedido do dono — nesta sessão o dono disse
+que faria os commits). Últimos commits em `main`: `1cdc99e` (F7), `a414eed` (F8).
 
 **Gotchas / aprendizados (importantes):**
 - O **gate do projeto são OS DOIS: `npx tsc --noEmit` E `npm test`** — o vitest transpila sem type-check,
   então passa mesmo com erro de tipo. Sempre rode os dois.
 - O **import** (arquivo/texto) precisa de **timeout longo**: a chamada à NIM leva ~50s para um currículo
   completo. O import usa **180s + `json_object`** (não `json_schema`) em `nim.ts` — 60s causava 502.
+- A **GERAÇÃO** (Modo 1/2) tem o mesmo risco depois que ficou rica (ADR-0023): use **180s + 1 retry +
+  `temperature: 0.3`** em `nim.ts`. O timeout de 60s causava **retry storm** (3×60s ≈ 182s e 502s); a
+  temperatura padrão dava **variância alta** (uma geração mantinha tudo, outra cortava metade). Serialize os
+  prompts com `JSON.stringify(x)` **compacto** (sem indent) para cortar tokens.
 - O schema de rascunho do import (`ImportProfileBundleSchema`) é **tolerante** (campo ausente → "") para um
   currículo incompleto não dar 502; a obrigatoriedade fica no `PUT /api/profile` (estrito).
 - **SQLite guarda DateTime como epoch em MILISSEGUNDOS** → migrações com backfill de data precisam

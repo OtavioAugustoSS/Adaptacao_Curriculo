@@ -34,6 +34,7 @@ REGRA INEGOCIÁVEL — NÃO INVENTE NADA:
 OBJETIVO DE QUALIDADE — CURRÍCULO RICO E EQUILIBRADO (não enxugue demais):
 - Este currículo precisa passar tanto na triagem automática por IA (ATS) quanto na leitura de um recrutador humano. Um currículo rico e verdadeiro é melhor que um enxuto e genérico.
 - MANTENHA todas as experiências reais e a MAIORIA dos projetos. Só OMITA um item inteiro quando ele estiver CLARAMENTE fora do escopo da vaga — na dúvida sobre relevância, mantenha o item e reescreva o enquadramento para a vaga. Ter 1–2 páginas (ou mais) é normal; NÃO force caber em uma página cortando conteúdo verdadeiro relevante.
+- ATENÇÃO (currículo de início de carreira / poucos itens): quando a base tem POUCAS experiências (ex.: 2) e poucos projetos (ex.: 3), MANTENHA TODOS — não remova NENHUMA experiência nem projeto. "Adaptar" aqui é reescrever a redação e priorizar a ORDEM, NUNCA reduzir o conjunto. Reduzir 2 experiências para 1, ou 3 projetos para 1, é ERRADO. A diversidade de experiência é um ATIVO para quem está começando.
 - PROFUNDIDADE DOS BULLETS: preserve a riqueza dos bullets reais da base. Cada bullet importante deve deixar claro o CONTEXTO/PROBLEMA, O QUE FOI FEITO, o IMPACTO/RESULTADO e a JUSTIFICATIVA DA ESCOLHA TÉCNICA quando isso existir na base. Reescreva a redação à vontade, mas condense APENAS os itens menos relevantes para a vaga — nunca reduza um bullet rico a uma frase genérica nem descarte realizações reais.
 - STACK: para cada experiência e projeto, inclua a linha de tecnologias (techStack) reais — priorizando as que a vaga pede E que o item realmente usa, sem nunca adicionar tecnologia que ele não tem.
 - PALAVRAS-CHAVE: use de forma natural os termos reais da vaga que casam com itens reais da base (ajuda no ATS) — sem inventar para casar.
@@ -41,7 +42,7 @@ OBJETIVO DE QUALIDADE — CURRÍCULO RICO E EQUILIBRADO (não enxugue demais):
 TAREFA:
 - Leia a VAGA e a BASE. Monte um currículo adaptado à vaga usando APENAS itens reais da base.
 - Priorize e reordene os itens reais que mais casam com a vaga; mantenha os demais que forem minimamente relevantes (reescrevendo o enquadramento) e omita só o que estiver claramente fora do escopo.
-- Escreva o "objective" como um resumo profissional curto, orientado à vaga, baseado SOMENTE no resumo/itens reais da base (sem fatos novos, sem requisitos da vaga que o usuário não tenha).
+- Escreva o "objective" ESPECÍFICO para ESTA vaga (NÃO um resumo genérico nem cópia do currículo de referência): um resumo curto que posiciona o candidato para o cargo/área da vaga, citando a stack/área da vaga que o usuário REALMENTE domina (sem fatos novos, sem requisitos que o usuário não tenha). Se a vaga é de back-end PHP, o objetivo fala de back-end/PHP reais da base — não de "automações em geral".
 - Para cada experiência selecionada, copie "sourceId", "role", "company" e o período EXATAMENTE como na base (apenas formate o período de forma legível). Reescreva os bullets alinhando a linguagem à vaga e PRESERVANDO a profundidade (problema → o que fez → impacto → porquê técnico), sem inventar conquistas nem tecnologias.
 - Para cada projeto selecionado, copie "sourceId", "title" e "url" reais; reescreva a "description" alinhando à vaga; e inclua os "bullets" e o "techStack" reais do projeto na base (pode reescrever a redação dos bullets e priorizar as tecnologias que a vaga pede E que o projeto realmente usa — nunca adicionar tecnologia que o projeto não tem).
 - Agrupe habilidades por categoria conforme a base, destacando as que a vaga pede E que o usuário realmente tem. Selecione projetos e formações reais. Inclua os idiomas e cursos/certificações reais relevantes (nome/proficiência, título/emissor/data exatos da base).
@@ -79,13 +80,14 @@ export function buildJobAdaptiveCvUserPrompt(
   jobText: string,
   baseContent?: ResumeContent,
 ): string {
-  const base = JSON.stringify(bundle, null, 2);
+  // JSON compacto (ADR-0023): sem indentação — mesma informação, menos tokens (mais rápido).
+  const base = JSON.stringify(bundle);
   const referenceBlock = baseContent
     ? `
 
-CURRÍCULO PADRÃO DE REFERÊNCIA (use APENAS como referência de PROFUNDIDADE, ESTRUTURA e COMPLETUDE — é o nível de detalhe e a quantidade de itens que se espera no resultado adaptado; NÃO é fonte de fatos novos: todo fato vem da BASE acima, e o resultado adaptado não deve ficar mais pobre que esta referência sem um bom motivo de relevância para a vaga):
+CURRÍCULO PADRÃO DE REFERÊNCIA (use como referência de PROFUNDIDADE, ESTRUTURA e COMPLETUDE — é o nível de detalhe e a quantidade de itens que se espera no resultado; NÃO é fonte de fatos novos: todo fato vem da BASE acima. O resultado adaptado deve ter o MESMO CONJUNTO de itens desta referência — TODAS as experiências e TODOS os projetos dela, NÃO remova nenhum. ADAPTE a REDAÇÃO, não o conjunto: reescreva o "objective" focado NESTA vaga (não copie o objetivo genérico da referência) e alinhe a linguagem dos bullets à vaga, mantendo a profundidade E A QUANTIDADE de bullets de cada item — se um item tem 5 bullets na referência, o resultado também deve ter ~5 (NÃO reduza para 1–2)):
 
-${JSON.stringify(baseContent, null, 2)}`
+${JSON.stringify(baseContent)}`
     : "";
   return `VAGA (texto colado pelo usuário — use APENAS para selecionar/priorizar/reescrever itens reais da base; NÃO extraia fatos da vaga para o currículo):
 

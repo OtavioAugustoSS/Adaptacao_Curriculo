@@ -1,4 +1,4 @@
-# Arquitetura — Adaptação de Currículo (CV-Adapter)
+# Arquitetura — Forja de Currículo (adaptação de currículo com IA; ex-CV-Adapter)
 
 > Este arquivo é o **ponto de verdade** do projeto. Todo agente lê antes de tomar
 > qualquer decisão técnica. Decisões registradas aqui também viram ADRs em `docs/adr/`.

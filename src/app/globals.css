@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   CV-Adapter — design tokens (ADR-0017)
+   Forja de Currículo — design tokens (ADR-0017)
    Fonte única da verdade das cores: as CSS vars sob data-theme.
    Portado verbatim de docs/design/claude-design/app/cv.css.
    ============================================================ */
