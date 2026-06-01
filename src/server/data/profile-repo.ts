@@ -10,6 +10,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { getCurrentUserId } from "@/server/auth/getCurrentUserId";
+import { stripNulDeep } from "@/server/data/sanitize";
 import type {
   ProfileBundle,
   Profile,
@@ -219,8 +220,13 @@ export async function clearProfile(): Promise<void> {
  * base não são referenciados externamente — o renderer/guardrail usam sourceId dos
  * itens REAIS lidos no momento da geração, não ids persistidos de versões antigas).
  */
-export async function saveProfileBundle(bundle: ProfileBundle): Promise<ProfileBundle> {
+export async function saveProfileBundle(input: ProfileBundle): Promise<ProfileBundle> {
   const userId = await getCurrentUserId();
+
+  // Fronteira de escrita: remove NUL (U+0000) de TODO texto antes de tocar o Postgres.
+  // O Postgres rejeita NUL em colunas `text` (erro 22021); ele costuma chegar via import
+  // de PDF/DOCX. Saneando aqui, qualquer caminho de entrada (form, import) fica coberto.
+  const bundle = stripNulDeep(input);
   const p = bundle.profile;
 
   const profileData = {

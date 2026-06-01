@@ -13,6 +13,7 @@
 // SEM OCR (ADR-0019 §5): PDF imagem/digitalizado devolve texto vazio; a rota mapeia a 422.
 
 import { isAcceptedImportFile } from "@/lib/import-file";
+import { stripNul } from "@/server/data/sanitize";
 
 /**
  * Tipo de arquivo fora da whitelist (nem PDF, nem DOCX, nem TXT). A rota mapeia a 415
@@ -65,20 +66,22 @@ export async function extractTextFromFile(input: ExtractTextInput): Promise<stri
 
   // PDF -> unpdf (JS puro, serverless). Import dinâmico: a lib (wrap do pdfjs) só carrega
   // quando há um PDF de fato, sem pesar o cold start das outras rotas.
+  // `stripNul`: extração de PDF/DOCX pode emitir o byte NUL, que o Postgres rejeita no
+  // save (erro 22021). Limpamos na fronteira de extração para o texto já sair são.
   if (looksLikePdf(mimeType, fileName)) {
     const { getDocumentProxy, extractText } = await import("unpdf");
     const pdf = await getDocumentProxy(bytes);
     const { text } = await extractText(pdf, { mergePages: true });
-    return text;
+    return stripNul(text);
   }
 
   // DOCX -> mammoth. A API só aceita Buffer do Node (não Uint8Array cru), então converte.
   if (looksLikeDocx(mimeType, fileName)) {
     const mammoth = (await import("mammoth")).default;
     const { value } = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
-    return value;
+    return stripNul(value);
   }
 
   // TXT (ou qualquer item da whitelist que sobrou): decodifica como UTF-8, sem lib.
-  return new TextDecoder("utf-8").decode(bytes);
+  return stripNul(new TextDecoder("utf-8").decode(bytes));
 }

@@ -278,6 +278,44 @@ describe("saveProfileBundle — serialização e contrato de escrita", () => {
     expect(upsertArg.create.email).toBeNull();
   });
 
+  it("deve remover o byte NUL de TODO texto antes de tocar o Postgres (regressão prod)", async () => {
+    // O Postgres rejeita NUL (U+0000) em colunas `text` (erro 22021) — o SQLite do MVP
+    // aceitava. Texto de import de PDF/DOCX podia trazer NUL e quebrar o save (500).
+    // saveProfileBundle saneia na fronteira de escrita: nada com NUL chega ao Prisma.
+    const NUL = String.fromCharCode(0);
+    stubReadbackEmpty();
+    prismaMock.profile.upsert.mockResolvedValue({ id: "p1" });
+
+    await saveProfileBundle({
+      profile: { fullName: "Maria" + NUL + " Silva", summary: "resumo" + NUL },
+      experiences: [
+        {
+          company: "Acme" + NUL,
+          role: "Dev",
+          startDate: "2020",
+          current: false,
+          bullets: ["fez" + NUL + " A", "fez B"],
+          order: 0,
+        },
+      ],
+      educations: [],
+      skills: [],
+      projects: [],
+      languages: [],
+      courses: [],
+    });
+
+    const upsertArg = prismaMock.profile.upsert.mock.calls[0][0];
+    expect(upsertArg.create.fullName).toBe("Maria Silva");
+    expect(upsertArg.create.summary).toBe("resumo");
+
+    const expArg = prismaMock.experience.createMany.mock.calls[0][0];
+    expect(expArg.data[0].company).toBe("Acme");
+    // bullets é serializado como String-JSON; o NUL não pode sobreviver nem dentro do JSON.
+    expect(expArg.data[0].bullets).toBe(JSON.stringify(["fez A", "fez B"]));
+    expect(expArg.data[0].bullets.includes(NUL)).toBe(false);
+  });
+
   it("deve gravar o `current` da formação como veio no bundle (US-12)", async () => {
     stubReadbackEmpty();
     prismaMock.profile.upsert.mockResolvedValue({ id: "p1" });

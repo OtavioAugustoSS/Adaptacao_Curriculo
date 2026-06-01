@@ -43,6 +43,9 @@ export async function PUT(req: NextRequest) {
     const bundle = await saveProfileBundle(parsed.data);
     return NextResponse.json(bundle);
   } catch (err) {
+    // Log no servidor: em produção o envelope esconde `details`, então sem isto o 500
+    // ficava invisível nos logs do host (foi o que dificultou diagnosticar o bug do NUL).
+    console.error("[PUT /api/profile] falha ao salvar a base:", err);
     return errorResponse(
       500,
       "INTERNAL_ERROR",
