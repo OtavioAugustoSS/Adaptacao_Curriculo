@@ -266,88 +266,116 @@ export async function saveProfileBundle(input: ProfileBundle): Promise<ProfileBu
 
     const base = { userId, profileId };
 
+    // Recria as 6 listas em PARALELO (mesmo padrão dos deletes acima). Cada createMany
+    // é 1 round-trip; em série eram 6 idas-e-voltas que, somadas à latência
+    // Render(free)→Neon (pooled), estouravam o timeout interativo do Prisma (P2028,
+    // ~5.2s > 5s default). Em paralelo, ~1 round-trip. As tabelas são distintas e só
+    // compartilham FK de leitura no mesmo Profile → sem conflito de lock.
+    const creates: Promise<unknown>[] = [];
+
     if (bundle.experiences.length > 0) {
-      await tx.experience.createMany({
-        data: bundle.experiences.map((e, order) => ({
-          ...base,
-          company: e.company,
-          role: e.role,
-          location: e.location ?? null,
-          startDate: e.startDate,
-          endDate: e.endDate ?? null,
-          current: e.current,
-          bullets: JSON.stringify(e.bullets),
-          order,
-        })),
-      });
+      creates.push(
+        tx.experience.createMany({
+          data: bundle.experiences.map((e, order) => ({
+            ...base,
+            company: e.company,
+            role: e.role,
+            location: e.location ?? null,
+            startDate: e.startDate,
+            endDate: e.endDate ?? null,
+            current: e.current,
+            bullets: JSON.stringify(e.bullets),
+            order,
+          })),
+        }),
+      );
     }
 
     if (bundle.educations.length > 0) {
-      await tx.education.createMany({
-        data: bundle.educations.map((e, order) => ({
-          ...base,
-          institution: e.institution,
-          degree: e.degree,
-          field: e.field ?? null,
-          startDate: e.startDate,
-          endDate: e.endDate ?? null,
-          current: e.current,
-          gpa: e.gpa ?? null,
-          details: e.details ?? null,
-          order,
-        })),
-      });
+      creates.push(
+        tx.education.createMany({
+          data: bundle.educations.map((e, order) => ({
+            ...base,
+            institution: e.institution,
+            degree: e.degree,
+            field: e.field ?? null,
+            startDate: e.startDate,
+            endDate: e.endDate ?? null,
+            current: e.current,
+            gpa: e.gpa ?? null,
+            details: e.details ?? null,
+            order,
+          })),
+        }),
+      );
     }
 
     if (bundle.skills.length > 0) {
-      await tx.skill.createMany({
-        data: bundle.skills.map((s, order) => ({
-          ...base,
-          category: s.category,
-          name: s.name,
-          level: s.level ?? null,
-          order,
-        })),
-      });
+      creates.push(
+        tx.skill.createMany({
+          data: bundle.skills.map((s, order) => ({
+            ...base,
+            category: s.category,
+            name: s.name,
+            level: s.level ?? null,
+            order,
+          })),
+        }),
+      );
     }
 
     if (bundle.projects.length > 0) {
-      await tx.project.createMany({
-        data: bundle.projects.map((pr, order) => ({
-          ...base,
-          name: pr.name,
-          description: pr.description,
-          bullets: JSON.stringify(pr.bullets),
-          techStack: JSON.stringify(pr.techStack),
-          url: pr.url ?? null,
-          order,
-        })),
-      });
+      creates.push(
+        tx.project.createMany({
+          data: bundle.projects.map((pr, order) => ({
+            ...base,
+            name: pr.name,
+            description: pr.description,
+            bullets: JSON.stringify(pr.bullets),
+            techStack: JSON.stringify(pr.techStack),
+            url: pr.url ?? null,
+            order,
+          })),
+        }),
+      );
     }
 
     if (bundle.languages.length > 0) {
-      await tx.language.createMany({
-        data: bundle.languages.map((l, order) => ({
-          ...base,
-          name: l.name,
-          proficiency: l.proficiency,
-          order,
-        })),
-      });
+      creates.push(
+        tx.language.createMany({
+          data: bundle.languages.map((l, order) => ({
+            ...base,
+            name: l.name,
+            proficiency: l.proficiency,
+            order,
+          })),
+        }),
+      );
     }
 
     if (bundle.courses.length > 0) {
-      await tx.course.createMany({
-        data: bundle.courses.map((c, order) => ({
-          ...base,
-          title: c.title,
-          issuer: c.issuer,
-          date: c.date,
-          url: c.url ?? null,
-          order,
-        })),
-      });
+      creates.push(
+        tx.course.createMany({
+          data: bundle.courses.map((c, order) => ({
+            ...base,
+            title: c.title,
+            issuer: c.issuer,
+            date: c.date,
+            url: c.url ?? null,
+            order,
+          })),
+        }),
+      );
     }
+
+    await Promise.all(creates);
+  }, {
+    // A transação faz ~14 queries (2 upserts + 6 deletes + 6 inserts). O default do
+    // Prisma (5s) estourava sob a latência Render(free)→Neon pooled (P2028 — visto
+    // ~5.2s). 20s dá folga; com os inserts paralelizados o trabalho real cai bem abaixo.
+    // maxWait = teto de espera por uma conexão do pool antes de iniciar a transação.
+    maxWait: 10000,
+    timeout: 20000,
   });
 
   return getProfileBundle();

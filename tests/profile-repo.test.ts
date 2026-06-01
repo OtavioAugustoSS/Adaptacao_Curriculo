@@ -316,6 +316,26 @@ describe("saveProfileBundle — serialização e contrato de escrita", () => {
     expect(expArg.data[0].bullets.includes(NUL)).toBe(false);
   });
 
+  it("deve configurar um timeout generoso na transação (regressão P2028 Render→Neon)", async () => {
+    // O default do Prisma (5s) estourava sob a latência Render(free)→Neon pooled
+    // (P2028 "Transaction already closed", visto ~5.2s). O save precisa de folga.
+    stubReadbackEmpty();
+    prismaMock.profile.upsert.mockResolvedValue({ id: "p1" });
+
+    await saveProfileBundle({
+      profile: { fullName: "Otávio" },
+      experiences: [],
+      educations: [],
+      skills: [],
+      projects: [],
+      languages: [],
+      courses: [],
+    });
+
+    const opts = prismaMock.$transaction.mock.calls[0][1];
+    expect(opts?.timeout).toBeGreaterThanOrEqual(15000);
+  });
+
   it("deve gravar o `current` da formação como veio no bundle (US-12)", async () => {
     stubReadbackEmpty();
     prismaMock.profile.upsert.mockResolvedValue({ id: "p1" });
