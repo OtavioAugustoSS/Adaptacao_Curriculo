@@ -18,7 +18,7 @@ import type { GeneratedResume } from "@/lib/schemas";
 import { Icon } from "@/components/Icon";
 import { TexCode } from "@/components/TexCode";
 import { resumeModeBadge, visibleWarnings, formatResumeDate } from "@/lib/presentation/resume-meta";
-import { OVERLEAF_PROJECT_URL, OVERLEAF_BUTTON_LABEL } from "@/lib/overleaf";
+import { OVERLEAF_TEMPLATE_URL, OVERLEAF_BUTTON_LABEL } from "@/lib/overleaf";
 
 type Status = "loading" | "error" | "ready";
 
@@ -258,7 +258,7 @@ export default function CurriculosPage() {
                     </button>
                     <a
                       className="btn btn-secondary btn-sm"
-                      href={OVERLEAF_PROJECT_URL}
+                      href={OVERLEAF_TEMPLATE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -274,6 +274,14 @@ export default function CurriculosPage() {
                         <span className="star" aria-hidden="true">★</span> Definir como padrão
                       </button>
                     )}
+                    <Link
+                      className="btn btn-secondary btn-sm"
+                      href={`/curriculos/${resume.id}/editar`}
+                      style={{ textDecoration: "none" }}
+                      title="Editar o conteúdo deste currículo e regenerar o .tex"
+                    >
+                      <Icon name="edit" /> Editar
+                    </Link>
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => startRename(resume)}>
                       <Icon name="copy" /> Renomear
                     </button>

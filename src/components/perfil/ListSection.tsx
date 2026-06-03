@@ -168,7 +168,7 @@ export function ListSection<T extends Record<string, unknown>>({
   );
 }
 
-function Bullets({
+export function Bullets({
   items,
   onChange,
   placeholder,

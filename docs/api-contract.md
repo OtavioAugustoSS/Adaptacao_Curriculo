@@ -4,7 +4,18 @@
 > `architect-agent` e `fullstack-agent`. Mudanças só via proposta aprovada pelo architect,
 > registradas como nota abaixo + ADR.
 >
-> Última alteração: 2026-05-31 — **Fatia 11 (ADR-0028)** — produção; mudanças **aditivas**, domínio inalterado.
+> Última alteração: 2026-06-03 — **ADR-0029 + ADR-0030** — mudanças **aditivas**; domínio e invariante inalterados.
+> **ADR-0029 (link Overleaf):** ajuste de UI/config apenas — "Abrir no Overleaf" passa a apontar para o
+> **template público** faangpath (env `NEXT_PUBLIC_OVERLEAF_TEMPLATE_URL`, com fallback), não mais um projeto
+> privado (que dava erro de permissão a outros usuários). Sem mudança de rota/schema/domínio.
+> **ADR-0030 (edição manual de currículo):** rota nova **`GET /api/resumes/[id]`** → **`GeneratedResumeSchema`**
+> (404 se inexistente/alheio). **`PATCH /api/resumes/[id]`** passa a aceitar **`contentJson?: ResumeContent`**
+> (além de `name?`/`isDefault?`; o `refine` exige **≥1** dos três): a rota re-renderiza o `.tex` pelo renderer
+> **puro** (sem IA) e **zera** o `traceabilityReport`. O **guardrail NÃO roda** na edição manual (é o dono dos
+> dados editando, não a IA — invariante anti-alucinação intacto). `ResumeContentSchema`, renderer, geração e a
+> adaptação à vaga (que lê a base `/perfil`, ADR-0027) **inalterados**; `GET /api/resumes` segue igual.
+>
+> 2026-05-31 — **Fatia 11 (ADR-0028)** — produção; mudanças **aditivas**, domínio inalterado.
 > **ADR-0028:** rota nova pública **`GET /api/health`** → `{ ok: true }` (fora do middleware). As rotas caras
 > **`POST /api/resumes/generate`** e **`POST /api/profile/import*`** ganham **rate limit por usuário** →
 > **`429 TOO_MANY_REQUESTS`** (envelope padrão) ao exceder. Nenhum schema/rota de domínio muda.
@@ -119,7 +130,8 @@ Esboço (campos detalhados seguem o ERD em `docs/erd.md`):
 | POST | `/api/profile/import/file` | `multipart/form-data` (campo `file`) | `ProfileBundleSchema` | Extrai o texto de um arquivo (PDF/DOCX/TXT) **no servidor** e reusa o **mesmo** pipeline da `/import` → rascunho tolerante **não persistido**. Sem schema Zod (corpo binário): whitelist de tipo + limite de tamanho. `400` (sem arquivo), `415` (tipo), `413` (tamanho), `422` (texto vazio — PDF imagem, sem OCR), `502` (`LLMError`). ADR-0019. |
 | POST | `/api/resumes/generate` | `GenerateRequestSchema` | `GeneratedResumeSchema` | Gera currículo (Modo 1 ou 2): LLM → render → guardrail → persiste. `name?` opcional (default servidor). |
 | GET | `/api/resumes` | — | `GeneratedResumeSchema[]` | Lista o histórico de currículos gerados (inclui `name`). |
-| PATCH | `/api/resumes/[id]` | `{ name: string }` | `GeneratedResumeSchema` | Renomeia o currículo do usuário. **200**; **400** (Zod, `name` vazio); **404** (id inexistente/alheio). ADR-0021. |
+| GET | `/api/resumes/[id]` | — | `GeneratedResumeSchema` | Carrega um currículo do usuário (tela de edição). **404** (id inexistente/alheio). ADR-0030. |
+| PATCH | `/api/resumes/[id]` | `{ name?, isDefault?: true, contentJson? }` | `GeneratedResumeSchema` | Renomeia / define padrão / **edita o conteúdo** (≥1). Com `contentJson` (`ResumeContent`): re-renderiza o `.tex` (renderer puro, **sem IA**, **sem guardrail** — edição manual) e zera o `traceabilityReport`. **200**; **400** (Zod); **404** (id inexistente/alheio). ADR-0021/0022/0030. |
 | DELETE | `/api/resumes/[id]` | — | — (**204** sem corpo) | Exclui o currículo do usuário. **404** (id inexistente/alheio). ADR-0021. |
 | GET | `/api/resumes/[id]/download` | — | `text/plain` (`.tex`) | Baixa o `.tex` cacheado (`Content-Disposition: attachment`). |
 | DELETE | `/api/profile` | — | — (**204** sem corpo) | Limpa a base: apaga o `Profile` (cascade nas 6 listas); `getProfileBundle` volta a `emptyBundle()`. Idempotente. ADR-0021. |

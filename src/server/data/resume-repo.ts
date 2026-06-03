@@ -173,6 +173,36 @@ export async function setDefaultResume(
 }
 
 /**
+ * Atualiza o CONTEÚDO de um currículo do usuário atual (ADR-0030 — edição manual).
+ * Grava o `ResumeContent` editado + o `.tex` já re-renderizado (renderer puro `renderResume`,
+ * SEM IA) e **zera** o `traceabilityReport`: os avisos antigos descreviam a reescrita da IA,
+ * agora sobrescrita pelo usuário (`null` = "não avaliado", coerente com ADR-0014).
+ *
+ * O guardrail de rastreabilidade NÃO roda aqui: a edição é do dono dos dados, não alucinação
+ * da IA (ADR-0030) — o invariante anti-alucinação é sobre a IA, intacto. Restrito ao usuário
+ * (updateMany `where { id, userId }`): id inexistente/alheio → 0 linhas → `null` (handler 404).
+ */
+export async function updateGeneratedResumeContent(
+  id: string,
+  content: ResumeContent,
+  texOutput: string,
+): Promise<GeneratedResume | null> {
+  const userId = await getCurrentUserId();
+
+  const result = await prisma.generatedResume.updateMany({
+    where: { id, userId },
+    data: {
+      contentJson: JSON.stringify(content),
+      texOutput,
+      traceabilityReport: null,
+    },
+  });
+  if (result.count === 0) return null;
+
+  return getGeneratedResumeById(id);
+}
+
+/**
  * Exclui um currículo do usuário atual (ADR-0021 — DELETE /api/resumes/[id]).
  * Restrito ao usuário (deleteMany com `where: { id, userId }`): devolve `true` se algo
  * foi apagado, `false` se id inexistente/alheio (o handler responde 404).

@@ -22,7 +22,7 @@ import type { ProfileBundle, GeneratedResume } from "@/lib/schemas";
 import { Icon } from "@/components/Icon";
 import { TexCode } from "@/components/TexCode";
 import { visibleWarnings } from "@/lib/presentation/resume-meta";
-import { OVERLEAF_PROJECT_URL, OVERLEAF_BUTTON_LABEL } from "@/lib/overleaf";
+import { OVERLEAF_TEMPLATE_URL, OVERLEAF_BUTTON_LABEL, OVERLEAF_FLOW_HINT } from "@/lib/overleaf";
 
 // Estados da tela (spec §2.2): ocioso, validando pré-requisito, gerando (loading),
 // preview, erro (com retry).
@@ -367,7 +367,7 @@ export default function GerarPage() {
                   </a>
                   <a
                     className="btn btn-secondary"
-                    href={OVERLEAF_PROJECT_URL}
+                    href={OVERLEAF_TEMPLATE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -376,8 +376,8 @@ export default function GerarPage() {
                 </div>
               </div>
               <p className="gen-mode-hint" style={{ marginTop: 8 }}>
-                Copie o <span className="mono">.tex</span> e cole no projeto do Overleaf para compilar
-                o PDF.
+                {OVERLEAF_FLOW_HINT} Assim o template já traz o <span className="mono">resume.cls</span>{" "}
+                necessário para compilar o PDF.
               </p>
 
               {/* Avisos de rastreabilidade — em qualquer modo, só warnings (errors nunca). */}

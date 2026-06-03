@@ -30,6 +30,7 @@ import {
   listGeneratedResumes,
   getGeneratedResumeById,
   renameGeneratedResume,
+  updateGeneratedResumeContent,
   deleteGeneratedResume,
   setDefaultResume,
   getDefaultResume,
@@ -227,6 +228,35 @@ describe("renameGeneratedResume — renomear restrito ao usuário (ADR-0021)", (
 
     expect(result).toBeNull();
     // Não busca o registro quando nada mudou (evita ler de outro usuário).
+    expect(prismaMock.generatedResume.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateGeneratedResumeContent — edição manual restrita ao usuário (ADR-0030)", () => {
+  it("deve gravar content+tex, ZERAR o traceabilityReport e restringir a { id, userId }", async () => {
+    prismaMock.generatedResume.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.generatedResume.findFirst.mockResolvedValue(
+      makeRow({ contentJson: JSON.stringify(CONTENT), texOutput: "TEX-NOVO" }),
+    );
+
+    const result = await updateGeneratedResumeContent("gr1", CONTENT, "TEX-NOVO");
+
+    const arg = prismaMock.generatedResume.updateMany.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: "gr1", userId: "user-local" });
+    expect(arg.data.contentJson).toBe(JSON.stringify(CONTENT));
+    expect(arg.data.texOutput).toBe("TEX-NOVO");
+    // Avisos antigos eram da reescrita da IA, agora sobrescrita pelo usuário → null.
+    expect(arg.data.traceabilityReport).toBeNull();
+    expect(result?.texOutput).toBe("TEX-NOVO");
+  });
+
+  it("deve devolver null quando nada foi atualizado (id inexistente/alheio)", async () => {
+    prismaMock.generatedResume.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await updateGeneratedResumeContent("alheio", CONTENT, "x");
+
+    expect(result).toBeNull();
+    // Não busca o registro quando nada mudou (não vaza recurso alheio).
     expect(prismaMock.generatedResume.findFirst).not.toHaveBeenCalled();
   });
 });

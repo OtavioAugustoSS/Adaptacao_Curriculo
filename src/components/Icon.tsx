@@ -32,6 +32,7 @@ const PATHS = {
   globe: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M2 12h20 M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z",
   award: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12z M8.2 13.8 7 22l5-3 5 3-1.2-8.2",
   clock: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M12 7v5l3 2",
+  edit: "M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
